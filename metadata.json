@@ -1,0 +1,5 @@
+{
+  "name": "极简编译器",
+  "description": "A pristine, browser-based code compiler supporting Python and C++. Features a modern Monaco editor, real-time syntax highlighting, and instant client-side execution.",
+  "requestFramePermissions": []
+}
