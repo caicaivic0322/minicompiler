@@ -400,6 +400,7 @@ function App() {
   // Register Handler
   const handleRegister = useCallback(async (username: string, password: string): Promise<boolean> => {
     try {
+      addLog('system', `Debug: Starting register for ${username}...`);
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
@@ -407,9 +408,18 @@ function App() {
         },
         body: JSON.stringify({ username, password }),
       });
+      addLog('system', `Debug: Fetch returned status ${response.status}`);
 
       if (response.ok) {
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+          addLog('system', 'Debug: JSON parsed successfully');
+        } catch (jsonErr) {
+          addLog('error', `Debug: JSON parse error: ${jsonErr}`);
+          throw jsonErr;
+        }
+        
         setAuthToken(data.token);
         setUser({ username: data.username, isLoggedIn: true });
         
@@ -431,8 +441,12 @@ function App() {
         addLog('error', `注册失败: ${errorMessage}`);
         return false;
       }
-    } catch (err) {
-      addLog('error', `注册请求失败: ${err}`);
+    } catch (err: any) {
+      console.error('Register detailed error:', err);
+      addLog('error', `注册请求失败: ${err.message} (${err.name})`);
+      if (err.stack) {
+        console.log(err.stack); // Log to browser console for inspection
+      }
       return false;
     }
   }, []);
