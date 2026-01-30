@@ -5,15 +5,20 @@ import CodeEditor from './components/Editor';
 import Console from './components/Console';
 import TabBar from './components/TabBar';
 import LoginModal from './components/LoginModal';
-import ServerFilesModal from './components/ServerFilesModal';
+import SaveModal from './components/SaveModal';
 import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet, User } from './types';
 import { SNIPPETS, THEMES } from './constants';
+import ServerFilesModal from './components/ServerFilesModal';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
 
 function App() {
   // Theme State
   const [theme, setTheme] = useState<ThemeKey>('dark');
+  
+  // Save Modal State
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [tabToSave, setTabToSave] = useState<EditorTab | null>(null);
 
   // Tab State
   const [tabs, setTabs] = useState<EditorTab[]>([
