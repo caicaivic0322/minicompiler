@@ -31,6 +31,17 @@ const generateToken = () => {
 // 解析 JSON 请求体
 app.use(express.json());
 
+// 请求日志中间件
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// 健康检查 API
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', version: '1.0.1' });
+});
+
 // 注册 API
 app.post('/api/register', (req, res) => {
   try {

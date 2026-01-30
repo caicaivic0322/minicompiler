@@ -108,6 +108,12 @@ function App() {
     addLog('system', 'Initializing compilers...');
     initializeRuntimes();
 
+    // Check Server Health
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => addLog('system', `Server Status: ${data.status} (v${data.version})`))
+      .catch(err => addLog('error', `Server Health Check Failed: ${err}`));
+
     // 恢复登录状态
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
