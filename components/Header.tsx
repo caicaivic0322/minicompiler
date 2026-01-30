@@ -92,6 +92,11 @@ const Header: React.FC<HeaderProps> = ({ language, setLanguage, onRun, isRunning
             </>
           )}
         </button>
+
+        {/* Avatar */}
+        <div className="ml-2 w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden border border-border ring-2 ring-primary/20 shadow-sm animate-in fade-in zoom-in duration-300">
+          <img src="/avatar.jpg" alt="User Avatar" className="w-full h-full object-cover" />
+        </div>
       </div>
     </header>
   );
