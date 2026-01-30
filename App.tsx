@@ -411,9 +411,18 @@ function App() {
       addLog('system', `Debug: Fetch returned status ${response.status}`);
 
       if (response.ok) {
+        let text;
+        try {
+          text = await response.text();
+          addLog('system', `Debug: Raw response text: ${text}`);
+        } catch (readErr) {
+          addLog('error', `Debug: Failed to read response text: ${readErr}`);
+          throw readErr;
+        }
+
         let data;
         try {
-          data = await response.json();
+          data = JSON.parse(text);
           addLog('system', 'Debug: JSON parsed successfully');
         } catch (jsonErr) {
           addLog('error', `Debug: JSON parse error: ${jsonErr}`);
