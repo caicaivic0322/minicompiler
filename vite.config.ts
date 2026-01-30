@@ -33,24 +33,27 @@ function devServerApi(): PluginOption {
       server.middlewares.use('/api/register', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
-          res.end('Method not allowed');
+          res.end(JSON.stringify({ success: false, message: 'Method not allowed' }));
           return;
         }
 
-        let body = '';
-        req.on('data', chunk => body += chunk);
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(Buffer.from(chunk)));
         req.on('end', () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf-8');
             const { username, password } = JSON.parse(body);
             
             if (!username || !password) {
               res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: false, message: '用户名或密码不能为空' }));
               return;
             }
 
             if (USERS[username]) {
               res.statusCode = 409;
+              res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: false, message: '用户已存在' }));
               return;
             }
@@ -71,8 +74,10 @@ function devServerApi(): PluginOption {
               message: '注册成功'
             }));
           } catch (err: any) {
+            console.error('[DEV] Register Error:', err);
             res.statusCode = 500;
-            res.end('注册失败');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, message: '注册失败: ' + (err.message || 'Server Error') }));
           }
         });
       });
@@ -81,14 +86,15 @@ function devServerApi(): PluginOption {
       server.middlewares.use('/api/login', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
-          res.end('Method not allowed');
+          res.end(JSON.stringify({ success: false, message: 'Method not allowed' }));
           return;
         }
 
-        let body = '';
-        req.on('data', chunk => body += chunk);
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(Buffer.from(chunk)));
         req.on('end', () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf-8');
             const { username, password } = JSON.parse(body);
             
             if (USERS[username] && USERS[username] === password) {
@@ -104,27 +110,33 @@ function devServerApi(): PluginOption {
               }));
             } else {
               res.statusCode = 401;
+              res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ success: false, message: '用户名或密码错误' }));
             }
           } catch (err: any) {
+            console.error('[DEV] Login Error:', err);
             res.statusCode = 500;
-            res.end('登录失败');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, message: '登录失败' }));
           }
         });
       });
 
       // 验证 Token API
       server.middlewares.use('/api/verify', async (req, res) => {
-        if (req.method !== 'POST') {
+        // ... verify implementation is simple enough usually, skipping full replacement unless requested
+        // but let's be consistent with buffer reading if I'm replacing the block
+         if (req.method !== 'POST') {
           res.statusCode = 405;
           res.end('Method not allowed');
           return;
         }
 
-        let body = '';
-        req.on('data', chunk => body += chunk);
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(Buffer.from(chunk)));
         req.on('end', () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf-8');
             const { token } = JSON.parse(body);
             const isValid = validTokens.has(token);
             
@@ -132,23 +144,25 @@ function devServerApi(): PluginOption {
             res.end(JSON.stringify({ valid: isValid }));
           } catch (err) {
             res.statusCode = 500;
-            res.end('验证失败');
+            res.end(JSON.stringify({ valid: false }));
           }
         });
       });
-
+      
       // 登出 API
       server.middlewares.use('/api/logout', async (req, res) => {
-        if (req.method !== 'POST') {
+         // ... similar
+         if (req.method !== 'POST') {
           res.statusCode = 405;
           res.end('Method not allowed');
           return;
         }
 
-        let body = '';
-        req.on('data', chunk => body += chunk);
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(Buffer.from(chunk)));
         req.on('end', () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf-8');
             const { token } = JSON.parse(body);
             validTokens.delete(token);
             
@@ -156,11 +170,11 @@ function devServerApi(): PluginOption {
             res.end(JSON.stringify({ success: true }));
           } catch (err) {
             res.statusCode = 500;
-            res.end('登出失败');
+            res.end(JSON.stringify({ success: false }));
           }
         });
       });
-
+      
       // 保存文件 API（需要登录）
       server.middlewares.use('/api/save', async (req, res) => {
         if (req.method !== 'POST') {
@@ -169,39 +183,41 @@ function devServerApi(): PluginOption {
           return;
         }
 
-        let body = '';
-        req.on('data', chunk => body += chunk);
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(Buffer.from(chunk)));
         req.on('end', () => {
           try {
+            const body = Buffer.concat(chunks).toString('utf-8');
             const { filename, code, token } = JSON.parse(body);
             
             // 验证登录状态
             if (!token || !validTokens.has(token)) {
               res.statusCode = 401;
-              res.end('请先登录');
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: '请先登录' }));
               return;
             }
             
+            // ... validation ...
             if (!filename || !code) {
               res.statusCode = 400;
-              res.end('缺少文件名或代码内容');
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: '缺少文件名或代码内容' }));
               return;
             }
             
-            // 验证文件扩展名
             const validExtensions = ['.cpp', '.py', '.c', '.h', '.hpp'];
             const ext = path.extname(filename).toLowerCase();
             if (!validExtensions.includes(ext)) {
               res.statusCode = 400;
-              res.end('不支持的文件类型');
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, message: '不支持的文件类型' }));
               return;
             }
             
-            // 安全处理文件名
             const safeName = path.basename(filename);
             const filePath = path.join(SAVE_DIR, safeName);
             
-            // 写入文件
             fs.writeFileSync(filePath, code, 'utf-8');
             
             console.log(`[DEV] 文件已保存: ${safeName}`);
@@ -214,7 +230,8 @@ function devServerApi(): PluginOption {
           } catch (err: any) {
             console.error('保存文件失败:', err);
             res.statusCode = 500;
-            res.end('保存文件失败: ' + err.message);
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, message: '保存文件失败: ' + err.message }));
           }
         });
       });

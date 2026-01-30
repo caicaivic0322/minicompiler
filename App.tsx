@@ -415,8 +415,15 @@ function App() {
         addLog('success', `✓ 注册成功，欢迎 ${data.username}！`);
         return true;
       } else {
-        const errorData = await response.json();
-        addLog('error', `注册失败: ${errorData.message}`);
+        let errorMessage = '注册失败';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        addLog('error', `注册失败: ${errorMessage}`);
         return false;
       }
     } catch (err) {
