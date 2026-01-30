@@ -18,8 +18,96 @@ if (!fs.existsSync(SAVE_DIR)) {
   fs.mkdirSync(SAVE_DIR, { recursive: true });
 }
 
+// 用户存储（内存中，生产环境应使用数据库）
+const USERS = {}; 
+// Token 存储
+const validTokens = new Set();
+
+// 简单的 Token 生成器
+const generateToken = () => {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+};
+
 // 解析 JSON 请求体
 app.use(express.json());
+
+// 注册 API
+app.post('/api/register', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: '用户名或密码不能为空' });
+    }
+
+    if (USERS[username]) {
+      return res.status(409).json({ success: false, message: '用户已存在' });
+    }
+
+    // 注册成功，保存用户
+    USERS[username] = password;
+    console.log(`新用户注册: ${username}`);
+
+    // 自动登录
+    const token = generateToken();
+    validTokens.add(token);
+    
+    res.json({ 
+      success: true, 
+      token,
+      username,
+      message: '注册成功'
+    });
+  } catch (err) {
+    console.error('注册失败:', err);
+    res.status(500).json({ success: false, message: '注册失败: ' + err.message });
+  }
+});
+
+// 登录 API
+app.post('/api/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (USERS[username] && USERS[username] === password) {
+      const token = generateToken();
+      validTokens.add(token);
+      
+      console.log(`用户登录成功: ${username}`);
+      res.json({ 
+        success: true, 
+        token,
+        username 
+      });
+    } else {
+      res.status(401).json({ success: false, message: '用户名或密码错误' });
+    }
+  } catch (err) {
+    console.error('登录失败:', err);
+    res.status(500).json({ success: false, message: '登录失败' });
+  }
+});
+
+// 登出 API
+app.post('/api/logout', (req, res) => {
+  try {
+    const { token } = req.body;
+    validTokens.delete(token);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+});
+
+// 验证 Token API
+app.post('/api/verify', (req, res) => {
+  try {
+    const { token } = req.body;
+    res.json({ valid: validTokens.has(token) });
+  } catch (err) {
+    res.status(500).json({ valid: false });
+  }
+});
 
 // 提供静态文件服务
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -27,17 +115,22 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // 保存文件 API
 app.post('/api/save', (req, res) => {
   try {
-    const { filename, code, language } = req.body;
+    const { filename, code, language, token } = req.body;
+    
+    // 验证 Token
+    if (!token || !validTokens.has(token)) {
+      return res.status(401).json({ success: false, message: '请先登录' });
+    }
     
     if (!filename || !code) {
-      return res.status(400).send('缺少文件名或代码内容');
+      return res.status(400).json({ success: false, message: '缺少文件名或代码内容' });
     }
     
     // 验证文件扩展名
     const validExtensions = ['.cpp', '.py', '.c', '.h', '.hpp'];
     const ext = path.extname(filename).toLowerCase();
     if (!validExtensions.includes(ext)) {
-      return res.status(400).send('不支持的文件类型');
+      return res.status(400).json({ success: false, message: '不支持的文件类型' });
     }
     
     // 安全处理文件名，防止路径穿越
@@ -55,7 +148,7 @@ app.post('/api/save', (req, res) => {
     });
   } catch (err) {
     console.error('保存文件失败:', err);
-    res.status(500).send('保存文件失败: ' + err.message);
+    res.status(500).json({ success: false, message: '保存文件失败: ' + err.message });
   }
 });
 
