@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FolderOpen, FileCode, FileJson, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { ServerFile, Language } from '../types';
+import { buildApiUrl } from '../constants';
 
 interface ServerFilesModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ const ServerFilesModal: React.FC<ServerFilesModalProps> = ({ isOpen, onClose, on
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/files');
+      const response = await fetch(buildApiUrl('/api/files'));
       if (response.ok) {
         const data = await response.json();
         setFiles(data);
@@ -44,7 +45,7 @@ const ServerFilesModal: React.FC<ServerFilesModalProps> = ({ isOpen, onClose, on
   const handleOpenFile = async (filename: string) => {
     setSelectedFile(filename);
     try {
-      const response = await fetch(`/api/file/${encodeURIComponent(filename)}`);
+      const response = await fetch(buildApiUrl(`/api/file/${encodeURIComponent(filename)}`));
       if (response.ok) {
         const data = await response.json();
         const language = filename.endsWith('.py') ? Language.PYTHON : Language.CPP;
@@ -65,7 +66,7 @@ const ServerFilesModal: React.FC<ServerFilesModalProps> = ({ isOpen, onClose, on
     if (!confirm(`确定要删除 "${filename}" 吗？`)) return;
     
     try {
-      const response = await fetch(`/api/file/${encodeURIComponent(filename)}`, {
+      const response = await fetch(buildApiUrl(`/api/file/${encodeURIComponent(filename)}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${authToken}`

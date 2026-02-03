@@ -240,6 +240,48 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+app.all('/api/file/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const safeName = path.basename(filename);
+  const filePath = path.join(SAVE_DIR, safeName);
+
+  if (req.method === 'GET') {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send('文件不存在');
+      }
+
+      const code = fs.readFileSync(filePath, 'utf-8');
+      return res.json({ name: safeName, code });
+    } catch (err) {
+      return res.status(500).send('读取文件失败');
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token || !validTokens.has(token)) {
+      return res.status(401).send('请先登录');
+    }
+
+    try {
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send('文件不存在');
+      }
+
+      fs.unlinkSync(filePath);
+      console.log(`文件已删除: ${safeName}`);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).send('删除文件失败');
+    }
+  }
+
+  return res.status(405).send('Method not allowed');
+});
+
 // 处理所有路由请求，返回index.html以支持SPA应用
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

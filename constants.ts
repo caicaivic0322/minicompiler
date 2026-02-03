@@ -1,6 +1,32 @@
 
 import { Language, ThemeKey, ExampleSnippet } from './types';
 
+const normalizeApiBase = (value?: string) => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, '');
+  if (trimmed.startsWith('/')) return trimmed.replace(/\/$/, '');
+  return '';
+};
+
+const DEFAULT_API_BASE_URL = 'https://basic-czeo.onrender.com';
+
+const getWindowOrigin = () => {
+  if (typeof window === 'undefined') return '';
+  const origin = window.location?.origin;
+  if (!origin || origin === 'null') return '';
+  return origin.replace(/\/$/, '');
+};
+
+export const buildApiUrl = (path: string) => {
+  const envBase = normalizeApiBase((import.meta as any).env?.VITE_API_BASE_URL);
+  const base = envBase || getWindowOrigin() || DEFAULT_API_BASE_URL;
+  if (!base) return path;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+};
+
 export const DEFAULT_PYTHON_CODE = `print("Hello, World!")`;
 
 export const DEFAULT_CPP_CODE = `#include <iostream>

@@ -7,7 +7,7 @@ import TabBar from './components/TabBar';
 import LoginModal from './components/LoginModal';
 import SaveModal from './components/SaveModal';
 import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet, User } from './types';
-import { SNIPPETS, THEMES } from './constants';
+import { SNIPPETS, THEMES, buildApiUrl } from './constants';
 import ServerFilesModal from './components/ServerFilesModal';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
@@ -109,7 +109,7 @@ function App() {
     initializeRuntimes();
 
     // Check Server Health
-    fetch('/api/health')
+    fetch(buildApiUrl('/api/health'))
       .then(res => res.json())
       .then(data => addLog('system', `Server Status: ${data.status} (v${data.version})`))
       .catch(err => addLog('error', `Server Health Check Failed: ${err}`));
@@ -138,7 +138,7 @@ function App() {
     }
 
     try {
-      const response = await fetch('/api/save', {
+      const response = await fetch(buildApiUrl('/api/save'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -375,7 +375,7 @@ function App() {
   // Login Handler
   const handleLogin = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch('/api/login', {
+      const response = await fetch(buildApiUrl('/api/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ function App() {
   // Register Handler
   const handleRegister = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch('/api/register', {
+      const response = await fetch(buildApiUrl('/api/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -463,7 +463,7 @@ function App() {
   const handleLogout = useCallback(async () => {
     if (authToken) {
       try {
-        await fetch('/api/logout', {
+        await fetch(buildApiUrl('/api/logout'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
