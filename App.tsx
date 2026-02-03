@@ -38,13 +38,13 @@ function App() {
 
   // Font Size State
   const [editorFontSize, setEditorFontSize] = useState(14);
-  const [consoleFontSize, setConsoleFontSize] = useState(13); // Default console font slightly smaller
+  const [ioFontSize, setIoFontSize] = useState(13);
 
   const handleEditorFontIncrease = () => setEditorFontSize(prev => Math.min(prev + 1, 32));
   const handleEditorFontDecrease = () => setEditorFontSize(prev => Math.max(prev - 1, 10));
 
-  const handleConsoleFontIncrease = () => setConsoleFontSize(prev => Math.min(prev + 1, 32));
-  const handleConsoleFontDecrease = () => setConsoleFontSize(prev => Math.max(prev - 1, 10));
+  const handleConsoleFontIncrease = () => setIoFontSize(prev => Math.min(prev + 1, 32));
+  const handleConsoleFontDecrease = () => setIoFontSize(prev => Math.max(prev - 1, 10));
 
   // Resizing State
   const [consoleWidth, setConsoleWidth] = useState(40);
@@ -373,7 +373,7 @@ function App() {
 
 
   // Login Handler
-  const handleLogin = useCallback(async (username: string, password: string): Promise<boolean> => {
+  const handleLogin = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
       const response = await fetch('/api/login', {
         method: 'POST',
@@ -393,20 +393,31 @@ function App() {
         localStorage.setItem('user', JSON.stringify({ username: data.username, isLoggedIn: true }));
         
         addLog('success', `✓ 欢迎回来，${data.username}！`);
-        return true;
+        return { success: true };
       } else {
-        return false;
+        let message = '登录失败';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || message;
+        } catch (e) {
+          try {
+            const text = await response.text();
+            message = text || message;
+          } catch (_) {
+          }
+        }
+        addLog('error', `登录失败: ${message}`);
+        return { success: false, message };
       }
     } catch (err) {
       addLog('error', `登录失败: ${err}`);
-      return false;
+      return { success: false, message: '登录失败，请稍后重试' };
     }
   }, []);
 
   // Register Handler
-  const handleRegister = useCallback(async (username: string, password: string): Promise<boolean> => {
+  const handleRegister = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      addLog('system', `Debug: Starting register for ${username}...`);
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
@@ -414,26 +425,9 @@ function App() {
         },
         body: JSON.stringify({ username, password }),
       });
-      addLog('system', `Debug: Fetch returned status ${response.status}`);
 
       if (response.ok) {
-        let text;
-        try {
-          text = await response.text();
-          addLog('system', `Debug: Raw response text: ${text}`);
-        } catch (readErr) {
-          addLog('error', `Debug: Failed to read response text: ${readErr}`);
-          throw readErr;
-        }
-
-        let data;
-        try {
-          data = JSON.parse(text);
-          addLog('system', 'Debug: JSON parsed successfully');
-        } catch (jsonErr) {
-          addLog('error', `Debug: JSON parse error: ${jsonErr}`);
-          throw jsonErr;
-        }
+        const data = await response.json();
         
         setAuthToken(data.token);
         setUser({ username: data.username, isLoggedIn: true });
@@ -443,26 +437,25 @@ function App() {
         localStorage.setItem('user', JSON.stringify({ username: data.username, isLoggedIn: true }));
         
         addLog('success', `✓ 注册成功，欢迎 ${data.username}！`);
-        return true;
+        return { success: true };
       } else {
         let errorMessage = '注册失败';
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
         } catch (e) {
-          const text = await response.text();
-          errorMessage = text || errorMessage;
+          try {
+            const text = await response.text();
+            errorMessage = text || errorMessage;
+          } catch (_) {
+          }
         }
         addLog('error', `注册失败: ${errorMessage}`);
-        return false;
+        return { success: false, message: errorMessage };
       }
     } catch (err: any) {
-      console.error('Register detailed error:', err);
-      addLog('error', `注册请求失败: ${err.message} (${err.name})`);
-      if (err.stack) {
-        console.log(err.stack); // Log to browser console for inspection
-      }
-      return false;
+      addLog('error', `注册请求失败: ${err.message}`);
+      return { success: false, message: '注册失败，请稍后重试' };
     }
   }, []);
 
@@ -588,7 +581,8 @@ function App() {
                 value={stdin}
                 onChange={(e) => setStdin(e.target.value)}
                 placeholder="Enter input for your program here..."
-                className="w-full h-full bg-transparent text-sm text-mainText placeholder-secondary/50 focus:outline-none font-mono resize-none"
+                className="w-full h-full bg-transparent text-mainText placeholder-secondary/50 focus:outline-none font-mono resize-none"
+                style={{ fontSize: `${ioFontSize}px`, lineHeight: `${ioFontSize * 1.6}px` }}
               />
             </div>
           </div>
@@ -606,7 +600,7 @@ function App() {
             messages={messages}
             onClear={handleClearConsole}
             isRunning={isRunning}
-            fontSize={consoleFontSize}
+            fontSize={ioFontSize}
             onFontIncrease={handleConsoleFontIncrease}
             onFontDecrease={handleConsoleFontDecrease}
           />

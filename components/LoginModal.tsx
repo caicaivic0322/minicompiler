@@ -4,8 +4,8 @@ import { X, User, Lock, LogIn, Loader2, UserPlus, ArrowRight } from 'lucide-reac
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (username: string, password: string) => Promise<boolean>;
-  onRegister: (username: string, password: string) => Promise<boolean>;
+  onLogin: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  onRegister: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, onRegister }) => {
@@ -34,19 +34,15 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin, onReg
 
     setIsLoading(true);
     try {
-      const success = await (isLoginMode ? onLogin(username, password) : onRegister(username, password));
-      if (success) {
+      const result = await (isLoginMode ? onLogin(username, password) : onRegister(username, password));
+      if (result.success) {
         setUsername('');
         setPassword('');
         setConfirmPassword('');
         onClose();
       } else {
-        // Error handling is done inside onLogin/onRegister but we might set a generic error here if needed
-        // For now, relies on the return value. Ideally the hook should return the error message.
-        // But since we updated App.tsx to log errors, we can just show a generic message or rely on the logs.
-        // Let's show a generic one here for better UX.
-        if (isLoginMode) setError('用户名或密码错误');
-        // Register error is handled via logs usually but let's leave it blank or handled by App logs
+        const fallback = isLoginMode ? '用户名或密码错误' : '注册失败，请稍后重试';
+        setError(result.message || fallback);
       }
     } catch (err) {
       setError('操作失败，请重试');

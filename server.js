@@ -9,24 +9,55 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.set('trust proxy', 1);
 
-// 保存文件的目录
-const SAVE_DIR = path.join(__dirname, 'saved-files');
+const DATA_ROOT = process.env.RENDER_DATA_DIR || process.env.DATA_DIR || __dirname;
+const SAVE_DIR = path.join(DATA_ROOT, 'saved-files');
+const USERS_FILE = path.join(DATA_ROOT, 'users.json');
 
 // 确保保存目录存在
+if (!fs.existsSync(DATA_ROOT)) {
+  fs.mkdirSync(DATA_ROOT, { recursive: true });
+}
 if (!fs.existsSync(SAVE_DIR)) {
   fs.mkdirSync(SAVE_DIR, { recursive: true });
 }
 
-// 用户存储（内存中，生产环境应使用数据库）
-const USERS = {}; 
+let USERS = {}; 
 // Token 存储
 const validTokens = new Set();
+const loginAttempts = new Map();
 
 // 简单的 Token 生成器
 const generateToken = () => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
+
+const LOGIN_RATE_WINDOW_MS = Number.parseInt(process.env.LOGIN_RATE_WINDOW_MS || '60000', 10);
+const LOGIN_RATE_MAX = Number.parseInt(process.env.LOGIN_RATE_MAX || '5', 10);
+
+const loadUsers = () => {
+  if (!fs.existsSync(USERS_FILE)) {
+    USERS = {};
+    return;
+  }
+  try {
+    const raw = fs.readFileSync(USERS_FILE, 'utf-8');
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === 'object') {
+      USERS = parsed;
+      return;
+    }
+  } catch (err) {
+  }
+  USERS = {};
+};
+
+const persistUsers = () => {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(USERS, null, 2), 'utf-8');
+};
+
+loadUsers();
 
 // 解析 JSON 请求体
 app.use(express.json());
@@ -57,6 +88,12 @@ app.post('/api/register', (req, res) => {
 
     // 注册成功，保存用户
     USERS[username] = password;
+    try {
+      persistUsers();
+    } catch (err) {
+      delete USERS[username];
+      return res.status(500).json({ success: false, message: '用户保存失败' });
+    }
     console.log(`新用户注册: ${username}`);
 
     // 自动登录
@@ -79,8 +116,24 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
   try {
     const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: '用户名或密码不能为空' });
+    }
+
+    const clientKey = `${req.ip || 'unknown'}|${username}`;
+    const now = Date.now();
+    const windowStart = now - LOGIN_RATE_WINDOW_MS;
+    const attempts = loginAttempts.get(clientKey) || [];
+    const recentAttempts = attempts.filter((ts) => ts > windowStart);
+
+    if (recentAttempts.length >= LOGIN_RATE_MAX) {
+      loginAttempts.set(clientKey, recentAttempts);
+      return res.status(429).json({ success: false, message: '登录尝试过多，请稍后再试' });
+    }
     
     if (USERS[username] && USERS[username] === password) {
+      loginAttempts.delete(clientKey);
       const token = generateToken();
       validTokens.add(token);
       
@@ -91,6 +144,8 @@ app.post('/api/login', (req, res) => {
         username 
       });
     } else {
+      recentAttempts.push(now);
+      loginAttempts.set(clientKey, recentAttempts);
       res.status(401).json({ success: false, message: '用户名或密码错误' });
     }
   } catch (err) {

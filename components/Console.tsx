@@ -64,8 +64,8 @@ const Console: React.FC<ConsoleProps> = ({
 
       {/* Console Output */}
       <div 
-        className="flex-1 p-4 overflow-y-auto font-mono text-sm space-y-1 scroll-smooth"
-        style={{ fontSize: `${fontSize}px` }}
+        className="flex-1 p-4 overflow-y-auto font-mono space-y-1 scroll-smooth"
+        style={{ fontSize: `${fontSize}px`, lineHeight: `${fontSize * 1.6}px` }}
       >
         {messages.length === 0 && !isRunning && (
           <div className="text-secondary italic mt-2 opacity-60 select-none">
@@ -80,10 +80,10 @@ const Console: React.FC<ConsoleProps> = ({
               msg.type === 'error' 
                 ? 'text-error bg-error/10 border-l-2 border-error' 
                 : msg.type === 'success' 
-                  ? 'text-success bg-success/10 border-l-2 border-success font-medium' 
+                  ? 'text-secondary bg-surface/60 border-l-2 border-border' 
                   : msg.type === 'system' 
                     ? 'text-primary/80 bg-primary/5 italic text-xs' 
-                    : 'text-mainText bg-surface/80 border-l-2 border-primary/50 font-mono'
+                  : 'text-success bg-success/10 border-l-2 border-success font-medium'
             }`}
           >
             {msg.content}
