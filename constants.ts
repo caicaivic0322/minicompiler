@@ -570,4 +570,38 @@ export const THEMES: Record<ThemeKey, any> = {
       }
     }
   }
+  ,
+  cream: {
+    name: 'Cream (Study)',
+    isDark: false,
+    colors: {
+      '--bg-app': '251 246 235',     // Cream #fbf6eb
+      '--bg-panel': '255 252 247',   // Warm white #fffcf7
+      '--color-primary': '110 76 50', // Warm brown #6e4c32
+      '--color-secondary': '146 127 114', // Warm gray #927f72
+      '--color-accent': '232 148 115',   // Apricot #e89473
+      '--color-success': '98 138 102',   // Sage #628a66
+      '--color-error': '196 86 70',      // Terracotta #c45646
+      '--color-border': '235 225 210',   // Warm light #ebe1d2
+      '--color-text': '45 34 28',        // Deep brown #2d221c
+    },
+    monaco: {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '9a8779', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'b2523f' },
+        { token: 'string', foreground: '7a8f5a' },
+        { token: 'number', foreground: 'a7653a' },
+        { token: 'type', foreground: '6a7e86' },
+      ],
+      colors: {
+        'editor.background': '#fffcf7',
+        'editor.foreground': '#2d221c',
+        'editor.lineHighlightBackground': '#f6efe4',
+        'editorCursor.foreground': '#6e4c32',
+        'editorIndentGuide.background': '#efe4d6',
+      }
+    }
+  }
 };

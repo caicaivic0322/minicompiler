@@ -4,7 +4,7 @@ export enum Language {
   CPP = 'cpp',
 }
 
-export type ThemeKey = 'warm' | 'cold' | 'dark' | 'light';
+export type ThemeKey = 'warm' | 'cold' | 'dark' | 'light' | 'cream';
 
 export interface ExecutionResult {
   output: string;

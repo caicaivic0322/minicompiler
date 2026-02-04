@@ -14,7 +14,7 @@ import { initCpp, runCppCode } from './services/cppService';
 
 function App() {
   // Theme State
-  const [theme, setTheme] = useState<ThemeKey>('dark');
+  const [theme, setTheme] = useState<ThemeKey>('cream');
   
   // Save Modal State
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -110,9 +110,17 @@ function App() {
 
     // Check Server Health
     fetch(buildApiUrl('/api/health'))
-      .then(res => res.json())
-      .then(data => addLog('system', `Server Status: ${data.status} (v${data.version})`))
-      .catch(err => addLog('error', `Server Health Check Failed: ${err}`));
+      .then(res => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then(data => {
+        if (!data) return;
+        addLog('system', `Server Status: ${data.status} (v${data.version})`);
+      })
+      .catch(() => {
+        // Keep output clean if server health check fails (e.g. no backend running).
+      });
 
     // 恢复登录状态
     const savedToken = localStorage.getItem('authToken');

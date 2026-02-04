@@ -82,7 +82,7 @@ const Console: React.FC<ConsoleProps> = ({
                 : msg.type === 'success' 
                   ? 'text-secondary bg-surface/60 border-l-2 border-border' 
                   : msg.type === 'system' 
-                    ? 'text-primary/80 bg-primary/5 italic text-xs' 
+                    ? 'text-mainText' 
                   : 'text-success bg-success/10 border-l-2 border-success font-medium'
             }`}
           >
