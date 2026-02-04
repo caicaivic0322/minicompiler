@@ -1,24 +1,26 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import Header from './components/Header';
-import CodeEditor from './components/Editor';
 import Console from './components/Console';
 import TabBar from './components/TabBar';
-import LoginModal from './components/LoginModal';
 import SaveModal from './components/SaveModal';
-import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet, User } from './types';
+import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet } from './types';
 import { SNIPPETS, THEMES, buildApiUrl } from './constants';
-import ServerFilesModal from './components/ServerFilesModal';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
+
+const CodeEditor = lazy(() => import('./components/Editor'));
 
 function App() {
   // Theme State
   const [theme, setTheme] = useState<ThemeKey>('cream');
+  const [isEditorLoaded, setIsEditorLoaded] = useState(false);
+  const editorLoadTimerRef = useRef<number | null>(null);
+  const hasInitializedRef = useRef(false);
   
-  // Save Modal State
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [tabToSave, setTabToSave] = useState<EditorTab | null>(null);
+  // Rename Modal State
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [tabToRenameId, setTabToRenameId] = useState<string | null>(null);
 
   // Tab State
   const [tabs, setTabs] = useState<EditorTab[]>([
@@ -54,15 +56,16 @@ function App() {
   // Input State
   const [stdin, setStdin] = useState('');
 
-  // Auth State
-  const [user, setUser] = useState<User | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showFilesModal, setShowFilesModal] = useState(false);
-  const [pendingSaveTab, setPendingSaveTab] = useState<EditorTab | null>(null);
-
   const addLog = (type: ConsoleMessage['type'], content: string) => {
-    setMessages(prev => [...prev, { type, content, timestamp: Date.now() }]);
+    setMessages(prev => {
+      if (type === 'system') {
+        const last = prev[prev.length - 1];
+        if (last && last.type === 'system' && last.content === content) {
+          return prev;
+        }
+      }
+      return [...prev, { type, content, timestamp: Date.now() }];
+    });
   };
 
   const handleClearConsole = () => {
@@ -84,11 +87,17 @@ function App() {
 
   // Initialize Runtimes & Restore Session
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
     const initializeRuntimes = async () => {
       initCpp()
         .then(() => {
-          setRuntimeStatus(prev => ({ ...prev, cpp: true }));
-          addLog('system', 'C++ (JSCPP) runtime ready.');
+          setRuntimeStatus(prev => {
+            if (prev.cpp) return prev;
+            addLog('system', 'C++ (JSCPP) runtime ready.');
+            return { ...prev, cpp: true };
+          });
         })
         .catch(err => {
           console.error(err);
@@ -97,8 +106,11 @@ function App() {
 
       initPyodide()
         .then(() => {
-          setRuntimeStatus(prev => ({ ...prev, python: true }));
-          addLog('system', 'Python (Pyodide) runtime ready.');
+          setRuntimeStatus(prev => {
+            if (prev.python) return prev;
+            addLog('system', 'Python (Pyodide) runtime ready.');
+            return { ...prev, python: true };
+          });
         })
         .catch(err => {
           console.error(err);
@@ -122,72 +134,30 @@ function App() {
         // Keep output clean if server health check fails (e.g. no backend running).
       });
 
-    // 恢复登录状态
-    const savedToken = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser) {
-      setAuthToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (isEditorLoaded) {
+      if (editorLoadTimerRef.current !== null) {
+        window.clearTimeout(editorLoadTimerRef.current);
+        editorLoadTimerRef.current = null;
+      }
+      return;
+    }
+    editorLoadTimerRef.current = window.setTimeout(() => {
+      setIsEditorLoaded(true);
+    }, 1500);
+
+    return () => {
+      if (editorLoadTimerRef.current !== null) {
+        window.clearTimeout(editorLoadTimerRef.current);
+        editorLoadTimerRef.current = null;
+      }
+    };
+  }, [isEditorLoaded]);
 
   // ... (keeping resize logic)
 
-
-  // Save to Server Handler
-  const handleSaveToServer = useCallback(async (tab: EditorTab): Promise<boolean> => {
-    // 检查登录状态
-    if (!authToken) {
-      addLog('error', '请先登录后再保存到服务器');
-      setPendingSaveTab(tab);
-      setShowLoginModal(true);
-      return false;
-    }
-
-    try {
-      const response = await fetch(buildApiUrl('/api/save'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: tab.title,
-          code: tab.code,
-          language: tab.language,
-          token: authToken,
-        }),
-      });
-      
-      if (response.ok) {
-        addLog('success', `✓ 文件 "${tab.title}" 已保存到服务器`);
-        return true;
-      } else if (response.status === 401) {
-        addLog('error', '登录已过期，请重新登录');
-        handleLogout();
-        setPendingSaveTab(tab); // Retry after re-login
-        setShowLoginModal(true);
-        return false;
-      } else {
-        const error = await response.text();
-        addLog('error', `保存失败: ${error}`);
-        return false;
-      }
-    } catch (err) {
-      addLog('error', `保存到服务器失败: ${err}`);
-      return false;
-    }
-  }, [authToken]);
-
-  // Auto-save after login
-  useEffect(() => {
-    if (authToken && pendingSaveTab) {
-      const tabToSave = pendingSaveTab;
-      setPendingSaveTab(null); // Clear first to avoid loops
-      addLog('system', '登录成功，正在自动保存...');
-      handleSaveToServer(tabToSave);
-    }
-  }, [authToken, pendingSaveTab, handleSaveToServer]);
 
   // Vertical Resizing State (Input/Terminal)
   const [inputHeight, setInputHeight] = useState(120);
@@ -380,135 +350,24 @@ function App() {
 
 
 
-  // Login Handler
-  const handleLogin = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    try {
-      const response = await fetch(buildApiUrl('/api/login'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
+  const handleRenameActiveTab = useCallback((filename: string) => {
+    if (!tabToRenameId) return;
+    const normalized = filename.trim();
+    if (!normalized) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        setAuthToken(data.token);
-        setUser({ username: data.username, isLoggedIn: true });
-        
-        // 保存到 localStorage
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('user', JSON.stringify({ username: data.username, isLoggedIn: true }));
-        
-        addLog('success', `✓ 欢迎回来，${data.username}！`);
-        return { success: true };
-      } else {
-        let message = '登录失败';
-        try {
-          const errorData = await response.json();
-          message = errorData.message || message;
-        } catch (e) {
-          try {
-            const text = await response.text();
-            message = text || message;
-          } catch (_) {
-          }
-        }
-        addLog('error', `登录失败: ${message}`);
-        return { success: false, message };
-      }
-    } catch (err) {
-      addLog('error', `登录失败: ${err}`);
-      return { success: false, message: '登录失败，请稍后重试' };
-    }
-  }, []);
+    const ext = normalized.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+    const nextLanguage = ext === '.py' ? Language.PYTHON : ext === '.cpp' ? Language.CPP : null;
 
-  // Register Handler
-  const handleRegister = useCallback(async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    try {
-      const response = await fetch(buildApiUrl('/api/register'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        setAuthToken(data.token);
-        setUser({ username: data.username, isLoggedIn: true });
-        
-        // 保存到 localStorage
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('user', JSON.stringify({ username: data.username, isLoggedIn: true }));
-        
-        addLog('success', `✓ 注册成功，欢迎 ${data.username}！`);
-        return { success: true };
-      } else {
-        let errorMessage = '注册失败';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          try {
-            const text = await response.text();
-            errorMessage = text || errorMessage;
-          } catch (_) {
-          }
-        }
-        addLog('error', `注册失败: ${errorMessage}`);
-        return { success: false, message: errorMessage };
-      }
-    } catch (err: any) {
-      addLog('error', `注册请求失败: ${err.message}`);
-      return { success: false, message: '注册失败，请稍后重试' };
-    }
-  }, []);
-
-  // Logout Handler
-  const handleLogout = useCallback(async () => {
-    if (authToken) {
-      try {
-        await fetch(buildApiUrl('/api/logout'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: authToken }),
-        });
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
-    }
-    
-    setAuthToken(null);
-    setUser(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    addLog('system', '已退出登录');
-  }, [authToken]);
-
-  // Open file from server
-  const handleOpenServerFile = useCallback((filename: string, code: string, language: Language) => {
-    // 检查是否已达到最大标签数
-    if (tabs.length >= 3) {
-      addLog('error', '已达到最大标签数，请关闭一个标签后再打开');
-      return;
-    }
-
-    const newId = Date.now().toString();
-    const newTab: EditorTab = {
-      id: newId,
-      title: filename,
-      code: code,
-      language: language
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newId);
-    addLog('success', `✓ 已打开文件: ${filename}`);
-  }, [tabs.length]);
+    setTabs(prev => prev.map(t => {
+      if (t.id !== tabToRenameId) return t;
+      return {
+        ...t,
+        title: normalized,
+        language: nextLanguage ?? t.language,
+      };
+    }));
+    addLog('success', `✓ 文件已重命名为 "${normalized}"`);
+  }, [tabToRenameId]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-mainText transition-colors duration-300">
@@ -536,23 +395,44 @@ function App() {
             onSwitch={setActiveTabId}
             onClose={handleCloseTab}
             onAdd={handleAddTab}
-            onSaveToServer={handleSaveToServer}
-            onOpenServerFiles={() => setShowFilesModal(true)}
-            onShowLogin={() => setShowLoginModal(true)}
-            onLogout={handleLogout}
-            user={user}
+            onRename={() => {
+              setTabToRenameId(activeTabId);
+              setShowRenameModal(true);
+            }}
             onFontIncrease={handleEditorFontIncrease}
             onFontDecrease={handleEditorFontDecrease}
           />
 
           {/* Editor */}
-          <CodeEditor
-            language={activeTab.language}
-            code={activeTab.code}
-            onChange={handleUpdateCode}
-            theme={theme}
-            fontSize={editorFontSize}
-          />
+          {isEditorLoaded ? (
+            <Suspense
+              fallback={
+                <div className="h-full w-full rounded-lg border border-border shadow-xl bg-surface flex items-center justify-center">
+                  <div className="text-sm text-secondary">编辑器加载中...</div>
+                </div>
+              }
+            >
+              <CodeEditor
+                language={activeTab.language}
+                code={activeTab.code}
+                onChange={handleUpdateCode}
+                theme={theme}
+                fontSize={editorFontSize}
+              />
+            </Suspense>
+          ) : (
+            <div className="h-full w-full rounded-lg border border-border shadow-xl bg-surface transition-colors duration-300 relative">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-sm text-secondary">点击开始编辑</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditorLoaded(true)}
+                className="absolute inset-0 w-full h-full cursor-text"
+                aria-label="点击加载编辑器"
+              />
+            </div>
+          )}
         </section>
 
         {/* Resizer Handle (Desktop Only) */}
@@ -615,21 +495,15 @@ function App() {
         </section>
       </main>
 
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-      />
-
-      {/* Server Files Modal */}
-      <ServerFilesModal
-        isOpen={showFilesModal}
-        onClose={() => setShowFilesModal(false)}
-        onOpenFile={handleOpenServerFile}
-        isLoggedIn={!!user}
-        authToken={authToken}
+      {/* Rename Modal */}
+      <SaveModal
+        isOpen={showRenameModal}
+        onClose={() => {
+          setShowRenameModal(false);
+          setTabToRenameId(null);
+        }}
+        onConfirm={handleRenameActiveTab}
+        initialFilename={activeTab?.title || ''}
       />
     </div>
   );

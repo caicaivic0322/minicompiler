@@ -4,7 +4,7 @@ export enum Language {
   CPP = 'cpp',
 }
 
-export type ThemeKey = 'warm' | 'cold' | 'dark' | 'light' | 'cream';
+export type ThemeKey = 'dark' | 'light' | 'cream';
 
 export interface ExecutionResult {
   output: string;
@@ -40,9 +40,4 @@ export interface ServerFile {
   name: string;
   size: number;
   modified: string;
-}
-
-export interface User {
-  username: string;
-  isLoggedIn: boolean;
 }

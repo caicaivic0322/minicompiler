@@ -1,5 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import 'monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution';
+import 'monaco-editor/esm/vs/basic-languages/python/python.contribution';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import { Language, ThemeKey } from '../types';
 import { THEMES } from '../constants';
 
@@ -10,6 +14,13 @@ interface CodeEditorProps {
   theme: ThemeKey;
   fontSize: number;
 }
+
+// Ensure Monaco workers are served from the same origin to avoid Edge CDN/worker issues.
+self.MonacoEnvironment = {
+  getWorker(_: string, label: string) {
+    return new EditorWorker();
+  },
+};
 
 const CodeEditor: React.FC<CodeEditorProps> = ({ language, code, onChange, theme, fontSize }) => {
   const monacoRef = useRef<any>(null);
@@ -40,6 +51,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ language, code, onChange, theme
         value={code}
         onChange={onChange}
         onMount={handleEditorDidMount}
+        monaco={monaco}
         options={{
           minimap: { enabled: false },
           fontSize: fontSize,

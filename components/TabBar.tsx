@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, FileCode, FileJson, BookOpen, Save, Download, Server, Check, AlertCircle, FolderOpen, LogIn, LogOut, User, ZoomIn, ZoomOut } from 'lucide-react';
-import { EditorTab, Language, ExampleSnippet, User as UserType } from '../types';
+import { Plus, X, FileCode, FileJson, BookOpen, Save, Download, Check, AlertCircle, Pencil, ZoomIn, ZoomOut } from 'lucide-react';
+import { EditorTab, Language, ExampleSnippet } from '../types';
 import { CPP_EXAMPLES, PYTHON_EXAMPLES } from '../constants';
 
 interface TabBarProps {
@@ -10,18 +10,14 @@ interface TabBarProps {
   onSwitch: (id: string) => void;
   onClose: (id: string, e: React.MouseEvent) => void;
   onAdd: (template?: ExampleSnippet) => void;
-  onSaveToServer?: (tab: EditorTab) => Promise<boolean>;
-  onOpenServerFiles?: () => void;
-  onShowLogin?: () => void;
-  onLogout?: () => void;
-  user?: UserType | null;
+  onRename?: () => void;
   onFontIncrease?: () => void;
   onFontDecrease?: () => void;
 }
 
 const TabBar: React.FC<TabBarProps> = ({ 
-  tabs, activeTabId, onSwitch, onClose, onAdd, onSaveToServer,
-  onOpenServerFiles, onShowLogin, onLogout, user,
+  tabs, activeTabId, onSwitch, onClose, onAdd,
+  onRename,
   onFontIncrease, onFontDecrease
 }) => {
   const isMaxTabs = tabs.length >= 3;
@@ -73,21 +69,6 @@ const TabBar: React.FC<TabBarProps> = ({
     URL.revokeObjectURL(url);
     
     setSaveStatus('success');
-    setTimeout(() => setSaveStatus('idle'), 2000);
-    setShowSaveMenu(false);
-  };
-
-  // Save to server
-  const handleSaveToServer = async () => {
-    if (!activeTab || !onSaveToServer) return;
-    
-    setSaveStatus('saving');
-    try {
-      const success = await onSaveToServer(activeTab);
-      setSaveStatus(success ? 'success' : 'error');
-    } catch {
-      setSaveStatus('error');
-    }
     setTimeout(() => setSaveStatus('idle'), 2000);
     setShowSaveMenu(false);
   };
@@ -238,64 +219,22 @@ const TabBar: React.FC<TabBarProps> = ({
                   </div>
                 </button>
                 <button
-                  onClick={handleSaveToServer}
-                  disabled={!onSaveToServer}
-                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-3 ${
-                    onSaveToServer 
-                      ? 'text-mainText hover:bg-background/80 hover:text-primary' 
-                      : 'text-secondary/50 cursor-not-allowed'
-                  }`}
+                  onClick={() => {
+                    onRename?.();
+                    setShowSaveMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-mainText hover:bg-background/80 hover:text-primary transition-colors flex items-center gap-3"
                 >
-                  <Server size={14} className="opacity-70" />
+                  <Pencil size={14} className="opacity-70" />
                   <div>
-                    <div className="font-medium">保存到服务器</div>
-                    <div className="text-xs text-secondary">
-                      {user ? '同步到云端存储' : '需要先登录'}
-                    </div>
+                    <div className="font-medium">修改文件名</div>
+                    <div className="text-xs text-secondary">重命名当前标签</div>
                   </div>
                 </button>
               </div>
             </div>
           )}
         </div>
-
-        {/* Open from Server Button */}
-        <button
-          onClick={onOpenServerFiles}
-          className="flex items-center justify-center p-1.5 rounded-md text-secondary hover:bg-surface hover:text-primary transition-colors"
-          title="从服务器打开文件"
-        >
-          <FolderOpen size={16} />
-        </button>
-
-        {/* Divider */}
-        <div className="w-px h-4 bg-border/50 mx-1" />
-
-        {/* Login/Logout Button */}
-        {user ? (
-          <div className="flex items-center gap-1">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-success/10 rounded-md">
-              <User size={14} className="text-success" />
-              <span className="text-xs font-medium text-success">{user.username}</span>
-            </div>
-              <button
-                onClick={onLogout}
-                className="flex items-center justify-center p-1.5 rounded-md text-secondary hover:bg-error/10 hover:text-error transition-colors"
-                title="退出登录"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={onShowLogin}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-secondary hover:bg-primary/10 hover:text-primary transition-colors"
-              title="登录"
-            >
-              <LogIn size={16} />
-              <span className="text-xs font-medium">登录</span>
-            </button>
-          )}
       </div>
     </div>
   );

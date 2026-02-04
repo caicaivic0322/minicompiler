@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, FileText } from 'lucide-react';
+import { X, Pencil, FileText } from 'lucide-react';
 
 interface SaveModalProps {
   isOpen: boolean;
@@ -35,8 +35,8 @@ const SaveModal: React.FC<SaveModalProps> = ({ isOpen, onClose, onConfirm, initi
       <div className="relative bg-surface border border-border rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
         <div className="flex items-center justify-between px-6 py-4 bg-background/50 border-b border-border">
           <h2 className="text-lg font-bold text-mainText flex items-center gap-2">
-            <Save size={18} className="text-primary" />
-            保存文件
+            <Pencil size={18} className="text-primary" />
+            修改文件名
           </h2>
           <button onClick={onClose} className="text-secondary hover:text-mainText">
             <X size={20} />
@@ -71,7 +71,7 @@ const SaveModal: React.FC<SaveModalProps> = ({ isOpen, onClose, onConfirm, initi
               type="submit"
               className="px-4 py-2 text-sm font-medium bg-primary text-background rounded-lg hover:brightness-110 transition-colors"
             >
-              确认保存
+              确认修改
             </button>
           </div>
         </form>
