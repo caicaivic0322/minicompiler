@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +18,66 @@ app.use(express.json());
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
+});
+
+// C++ 编译执行 API
+app.post('/api/compile/cpp', async (req, res) => {
+  const { code, stdin } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ error: 'Code is required' });
+  }
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const compileCmd = `echo '${code.replace(/'/g, "'\\''")}' | g++ -x c++ -std=c++17 -o /tmp/a.out -`;
+      
+      exec(compileCmd, (error, stdout, stderr) => {
+        if (error) {
+          resolve({
+            success: false,
+            stdout: '',
+            stderr: stderr || error.message,
+            code: error.code || 1
+          });
+          return;
+        }
+
+        if (stderr) {
+          resolve({
+            success: false,
+            stdout: '',
+            stderr: stderr,
+            code: 1
+          });
+          return;
+        }
+
+        exec('/tmp/a.out', { input: stdin || '', timeout: 5000 }, (runError, runStdout, runStderr) => {
+          if (runError) {
+            resolve({
+              success: false,
+              stdout: runStdout || '',
+              stderr: runStderr || runError.message,
+              code: runError.code || 1
+            });
+            return;
+          }
+
+          resolve({
+            success: true,
+            stdout: runStdout || '',
+            stderr: runStderr || '',
+            code: 0
+          });
+        });
+      });
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 健康检查 API
