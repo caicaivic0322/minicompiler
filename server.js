@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
+import fs from 'fs';
+import crypto from 'crypto';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -28,12 +30,19 @@ app.post('/api/compile/cpp', async (req, res) => {
     return res.status(400).json({ error: 'Code is required' });
   }
 
+  const id = crypto.randomBytes(8).toString('hex');
+  const sourceFile = `/tmp/${id}.cpp`;
+  const exeFile = `/tmp/${id}`;
+
   try {
+    fs.writeFileSync(sourceFile, code, 'utf8');
+
+    const compileCmd = `g++ -std=c++17 -o ${exeFile} ${sourceFile}`;
+
     const result = await new Promise((resolve, reject) => {
-      const compileCmd = `echo '${code.replace(/'/g, "'\\''")}' | g++ -x c++ -std=c++17 -o /tmp/a.out -`;
-      
       exec(compileCmd, (error, stdout, stderr) => {
         if (error) {
+          fs.unlinkSync(sourceFile);
           resolve({
             success: false,
             stdout: '',
@@ -43,7 +52,8 @@ app.post('/api/compile/cpp', async (req, res) => {
           return;
         }
 
-        if (stderr) {
+        if (stderr && stderr.trim()) {
+          fs.unlinkSync(sourceFile);
           resolve({
             success: false,
             stdout: '',
@@ -53,7 +63,12 @@ app.post('/api/compile/cpp', async (req, res) => {
           return;
         }
 
-        exec('/tmp/a.out', { input: stdin || '', timeout: 5000 }, (runError, runStdout, runStderr) => {
+        exec(exeFile, { input: stdin || '', timeout: 5000 }, (runError, runStdout, runStderr) => {
+          try {
+            fs.unlinkSync(sourceFile);
+            fs.unlinkSync(exeFile);
+          } catch (e) {}
+
           if (runError) {
             resolve({
               success: false,
@@ -76,6 +91,10 @@ app.post('/api/compile/cpp', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    try {
+      fs.unlinkSync(sourceFile);
+      fs.unlinkSync(exeFile);
+    } catch (e) {}
     res.status(500).json({ error: error.message });
   }
 });
