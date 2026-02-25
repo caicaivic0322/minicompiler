@@ -26,6 +26,8 @@ app.use((req, res, next) => {
 app.post('/api/compile/cpp', async (req, res) => {
   const { code, stdin } = req.body;
 
+  console.log('[C++ Compile] Received request, code length:', code?.length);
+
   if (!code) {
     return res.status(400).json({ error: 'Code is required' });
   }
@@ -36,13 +38,16 @@ app.post('/api/compile/cpp', async (req, res) => {
 
   try {
     fs.writeFileSync(sourceFile, code, 'utf8');
+    console.log('[C++ Compile] File written:', sourceFile);
 
     const compileCmd = `g++ -std=c++17 -o ${exeFile} ${sourceFile}`;
+    console.log('[C++ Compile] Running:', compileCmd);
 
     const result = await new Promise((resolve, reject) => {
       exec(compileCmd, (error, stdout, stderr) => {
         if (error) {
-          fs.unlinkSync(sourceFile);
+          console.log('[C++ Compile] Compile error:', error.message);
+          try { fs.unlinkSync(sourceFile); } catch (e) {}
           resolve({
             success: false,
             stdout: '',
@@ -53,7 +58,8 @@ app.post('/api/compile/cpp', async (req, res) => {
         }
 
         if (stderr && stderr.trim()) {
-          fs.unlinkSync(sourceFile);
+          console.log('[C++ Compile] Compile warning:', stderr);
+          try { fs.unlinkSync(sourceFile); } catch (e) {}
           resolve({
             success: false,
             stdout: '',
@@ -63,6 +69,7 @@ app.post('/api/compile/cpp', async (req, res) => {
           return;
         }
 
+        console.log('[C++ Compile] Compiled successfully, running...');
         exec(exeFile, { input: stdin || '', timeout: 5000 }, (runError, runStdout, runStderr) => {
           try {
             fs.unlinkSync(sourceFile);
@@ -70,6 +77,7 @@ app.post('/api/compile/cpp', async (req, res) => {
           } catch (e) {}
 
           if (runError) {
+            console.log('[C++ Compile] Run error:', runError.message);
             resolve({
               success: false,
               stdout: runStdout || '',
@@ -79,6 +87,7 @@ app.post('/api/compile/cpp', async (req, res) => {
             return;
           }
 
+          console.log('[C++ Compile] Success, output:', runStdout);
           resolve({
             success: true,
             stdout: runStdout || '',
@@ -91,6 +100,7 @@ app.post('/api/compile/cpp', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    console.log('[C++ Compile] Server error:', error.message);
     try {
       fs.unlinkSync(sourceFile);
       fs.unlinkSync(exeFile);
