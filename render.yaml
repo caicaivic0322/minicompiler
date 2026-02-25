@@ -2,7 +2,7 @@ services:
   - type: web
     name: minicompiler
     env: node
-    buildCommand: npm install && npm run build
+    buildCommand: apt-get update && apt-get install -y g++ && npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
