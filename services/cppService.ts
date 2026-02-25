@@ -1,27 +1,37 @@
-interface CompileResponse {
-  success: boolean;
-  stdout: string;
-  stderr: string;
-  code: number;
+interface PistonResponse {
+  run: {
+    stdout: string;
+    stderr: string;
+    code: number;
+    signal: string | null;
+    output: string;
+  };
+  message?: string;
 }
 
 export const initCpp = async (): Promise<void> => {
-  console.log("[System] C++ Runtime: Using Local Backend API");
+  console.log("[System] C++ Runtime: Using Piston API (Remote)");
   return Promise.resolve();
 };
 
 export const runCppCode = async (code: string, stdin: string, onOutput: (text: string) => void): Promise<void> => {
-  onOutput("[System] Compiling and running via Local Backend...\n");
+  onOutput("[System] Compiling and running via Piston API...\n");
 
   try {
-    const response = await fetch('/api/compile/cpp', {
+    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        code,
-        stdin
+        language: 'cpp',
+        version: '10.2.0',
+        files: [
+          {
+            content: code
+          }
+        ],
+        stdin: stdin
       }),
     });
 
@@ -29,18 +39,23 @@ export const runCppCode = async (code: string, stdin: string, onOutput: (text: s
       throw new Error(`API Request Failed: ${response.status} ${response.statusText}`);
     }
 
-    const result: CompileResponse = await response.json();
+    const result: PistonResponse = await response.json();
 
-    if (result.stderr) {
-      onOutput(`\n[Stderr]\n${result.stderr}`);
+    if (result.message) {
+      onOutput(`[Error] ${result.message}\n`);
+      return;
     }
 
-    if (result.stdout) {
-      onOutput(result.stdout);
-    }
-
-    if (result.code !== 0) {
-      onOutput(`\n[System] Process exited with code ${result.code}`);
+    if (result.run) {
+      if (result.run.stdout) {
+        onOutput(result.run.stdout);
+      }
+      if (result.run.stderr) {
+        onOutput(`\n[Stderr]\n${result.run.stderr}`);
+      }
+      if (result.run.code !== 0) {
+        onOutput(`\n[System] Process exited with code ${result.run.code}`);
+      }
     }
 
   } catch (error: any) {
