@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../constants';
+
 interface CompileResponse {
   run?: {
     stdout: string;
@@ -18,7 +20,7 @@ export const runCppCode = async (code: string, stdin: string, onOutput: (text: s
   onOutput("[System] Compiling and running via Backend Proxy...\n");
 
   try {
-    const response = await fetch('/api/compile/cpp', {
+    const response = await fetch(buildApiUrl('/api/compile/cpp'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
