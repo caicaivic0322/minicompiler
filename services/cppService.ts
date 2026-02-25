@@ -20,6 +20,7 @@ export const runCppCode = async (code: string, stdin: string, onOutput: (text: s
   try {
     const response = await fetch('https://emkc.org/api/v2/piston/execute', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
