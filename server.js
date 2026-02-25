@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fetch from 'node:fetch';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +26,10 @@ app.post('/api/compile/cpp', async (req, res) => {
   console.log('[C++ Compile] Forwarding to Piston API...');
 
   try {
+    if (!code) {
+      return res.status(400).json({ error: 'Code is required' });
+    }
+
     const response = await fetch('https://emkc.org/api/v2/piston/execute', {
       method: 'POST',
       headers: {
@@ -41,10 +44,17 @@ app.post('/api/compile/cpp', async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error(`API Request Failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Request Failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`);
     }
 
-    const result = await response.json();
+    const rawText = await response.text();
+    let result;
+    try {
+      result = rawText ? JSON.parse(rawText) : {};
+    } catch (err) {
+      return res.status(502).json({ error: 'Invalid JSON from Piston', raw: rawText });
+    }
     res.json(result);
   } catch (error) {
     console.log('[C++ Compile] Error:', error.message);
