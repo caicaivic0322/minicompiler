@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fetch from 'node:fetch';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -19,9 +20,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// C++ 编译执行 API (代理到 Piston)
+app.post('/api/compile/cpp', async (req, res) => {
+  const { code, stdin } = req.body;
+
+  console.log('[C++ Compile] Forwarding to Piston API...');
+
+  try {
+    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        language: 'cpp',
+        version: '10.2.0',
+        files: [{ content: code }],
+        stdin: stdin
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Request Failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    res.json(result);
+  } catch (error) {
+    console.log('[C++ Compile] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 健康检查 API
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.1' });
+  res.json({ status: 'ok', version: '1.0.2' });
 });
 
 // 提供静态文件服务

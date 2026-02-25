@@ -1,5 +1,5 @@
-interface PistonResponse {
-  run: {
+interface CompileResponse {
+  run?: {
     stdout: string;
     stderr: string;
     code: number;
@@ -10,29 +10,22 @@ interface PistonResponse {
 }
 
 export const initCpp = async (): Promise<void> => {
-  console.log("[System] C++ Runtime: Using Piston API (Remote)");
+  console.log("[System] C++ Runtime: Using Local Backend Proxy to Piston");
   return Promise.resolve();
 };
 
 export const runCppCode = async (code: string, stdin: string, onOutput: (text: string) => void): Promise<void> => {
-  onOutput("[System] Compiling and running via Piston API...\n");
+  onOutput("[System] Compiling and running via Backend Proxy...\n");
 
   try {
-    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+    const response = await fetch('/api/compile/cpp', {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        language: 'cpp',
-        version: '10.2.0',
-        files: [
-          {
-            content: code
-          }
-        ],
-        stdin: stdin
+        code,
+        stdin
       }),
     });
 
@@ -40,7 +33,7 @@ export const runCppCode = async (code: string, stdin: string, onOutput: (text: s
       throw new Error(`API Request Failed: ${response.status} ${response.statusText}`);
     }
 
-    const result: PistonResponse = await response.json();
+    const result: CompileResponse = await response.json();
 
     if (result.message) {
       onOutput(`[Error] ${result.message}\n`);
