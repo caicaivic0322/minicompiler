@@ -325,7 +325,7 @@ function App() {
           await initPyodide();
         }
         addLog('system', `>> Executing ${activeTab.title} (Python)...`);
-        await runPythonCode(currentCode, (text) => {
+        await runPythonCode(currentCode, stdin, (text) => {
           if (text.trim() !== '') addLog('info', text.trimEnd());
         });
       } else if (currentLang === Language.CPP) {

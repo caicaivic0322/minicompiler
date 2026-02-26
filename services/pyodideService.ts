@@ -31,7 +31,7 @@ export const initPyodide = async (): Promise<void> => {
   await pyodideLoadPromise;
 };
 
-export const runPythonCode = async (code: string, onOutput: (text: string) => void): Promise<void> => {
+export const runPythonCode = async (code: string, stdin: string, onOutput: (text: string) => void): Promise<void> => {
   if (!pyodideInstance) {
     await initPyodide();
   }
@@ -41,6 +41,20 @@ export const runPythonCode = async (code: string, onOutput: (text: string) => vo
   pyodideInstance.setStderr({ batched: (msg: string) => onOutput(msg + "\n") });
 
   try {
+    let inputIndex = 0;
+    const inputStr = stdin || "";
+    
+    // Use Pyodide's native setStdin
+    pyodideInstance.setStdin({
+      stdin: () => {
+        if (inputIndex < inputStr.length) {
+          return inputStr.charCodeAt(inputIndex++);
+        }
+        return null;
+      }
+    });
+
+    // Run user code
     await pyodideInstance.runPythonAsync(code);
   } catch (error: any) {
     onOutput(`Error: ${error.message}`);
