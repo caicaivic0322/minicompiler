@@ -333,10 +333,19 @@ function App() {
           addLog('system', 'Ensuring C++ runtime is loaded...');
         }
         addLog('system', `>> Compiling & Running ${activeTab.title} (C++)...`);
+        let cppBuffer = '';
         await runCppCode(currentCode, stdin, (text) => {
-          const cleanText = text.replace(/\n$/, '');
-          if (cleanText) addLog('info', cleanText);
+          cppBuffer += text;
+          // Flush complete lines as they arrive
+          const lines = cppBuffer.split('\n');
+          // Keep the last (potentially incomplete) segment in the buffer
+          cppBuffer = lines.pop() ?? '';
+          for (const line of lines) {
+            addLog('info', line);
+          }
         });
+        // Flush any remaining output that didn't end with \n
+        if (cppBuffer) addLog('info', cppBuffer);
       }
 
       const duration = (performance.now() - startTime).toFixed(2);
