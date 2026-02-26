@@ -19,6 +19,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// CORS (for Static Frontend)
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '*';
+const ALLOWED_METHODS = 'GET,POST,PUT,DELETE,OPTIONS';
+const ALLOWED_HEADERS = 'Content-Type, Authorization';
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', FRONTEND_ORIGIN);
+  res.setHeader('Access-Control-Allow-Methods', ALLOWED_METHODS);
+  res.setHeader('Access-Control-Allow-Headers', ALLOWED_HEADERS);
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 // C++ 编译执行 API (代理到 Piston)
 app.post('/api/compile/cpp', async (req, res) => {
   const { code, stdin } = req.body;
@@ -67,13 +83,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.2' });
 });
 
-// 提供静态文件服务
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// 处理所有路由请求，返回index.html以支持SPA应用
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
+// API only - no static file serving here
 
 // 启动服务器
 app.listen(PORT, () => {

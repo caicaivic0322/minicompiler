@@ -1,9 +1,21 @@
 services:
   - type: web
-    name: minicompiler
+    name: minicompiler-api
     env: node
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    buildCommand: npm install
+    startCommand: node server.js
     envVars:
       - key: NODE_VERSION
         value: 18
+      - key: FRONTEND_ORIGIN
+        value: https://minicompiler-web.onrender.com
+
+  - type: static
+    name: minicompiler-web
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_API_BASE_URL
+        value: https://minicompiler-api.onrender.com

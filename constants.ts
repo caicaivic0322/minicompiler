@@ -10,7 +10,7 @@ const normalizeApiBase = (value?: string) => {
   return '';
 };
 
-const DEFAULT_API_BASE_URL = 'https://basic-czeo.onrender.com';
+const DEFAULT_API_BASE_URL = 'https://minicompiler-api.onrender.com';
 
 const getWindowOrigin = () => {
   if (typeof window === 'undefined') return '';
