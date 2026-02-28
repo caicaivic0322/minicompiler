@@ -1,6 +1,6 @@
 # 极简编译器 (Minicompiler)
 
-![项目logo](https://via.placeholder.com/150x150?text=Minicompiler)
+![项目封面](./public/cover.png)
 
 一个功能强大的基于Web的在线代码编译器，提供C++和Python代码的编辑、编译和执行功能，为开发者提供便捷的在线编程体验。
 
@@ -18,6 +18,7 @@
 ## 🚀 功能特点
 
 ### 核心功能
+
 - **多语言支持**：内置支持C++和Python代码的编译与执行
 - **现代化编辑器**：集成Monaco编辑器，提供语法高亮、自动补全、代码折叠等高级编辑功能
 - **实时控制台输出**：即时显示代码执行结果、错误信息和警告
@@ -25,6 +26,7 @@
 - **响应式设计**：完美适配桌面、平板和移动设备，提供一致的用户体验
 
 ### 技术优势
+
 - **本地执行**：Python代码通过Pyodide在浏览器中直接执行，确保数据隐私和快速响应
 - **远程编译**：C++代码通过安全的远程API服务进行编译执行
 - **WebAssembly加速**：利用WebAssembly技术提升性能密集型任务的执行效率
@@ -33,6 +35,7 @@
 ## 🛠 技术栈
 
 ### 前端技术
+
 - **核心框架**：React 19 + TypeScript
 - **构建工具**：Vite 6
 - **代码编辑器**：Monaco Editor (VS Code的编辑器核心)
@@ -41,12 +44,14 @@
 - **状态管理**：React Hooks (可根据需要集成Redux或Context API)
 
 ### 后端技术
+
 - **服务器**：Express.js 4
 - **运行时**：Node.js 18+
 - **静态资源服务**：Express静态文件中间件
 - **路由处理**：Express路由系统，支持SPA应用路由
 
 ### 代码执行技术
+
 - **Python执行**：Pyodide (WebAssembly版本的Python)
 - **C++编译**：WebAssembly和Clang编译器工具链
 - **文件系统**：虚拟文件系统实现，支持多文件操作
@@ -54,6 +59,7 @@
 ## 📦 本地开发
 
 ### 环境要求
+
 - Node.js (v16或更高版本)
 - npm 或 yarn
 - 现代Web浏览器 (Chrome, Firefox, Safari, Edge最新版本)
@@ -61,24 +67,28 @@
 ### 安装步骤
 
 1. **克隆仓库**
+
    ```bash
    git clone https://github.com/caicaivic0322/minicompiler.git
    cd minicompiler
    ```
 
 2. **安装依赖**
+
    ```bash
    npm install
    ```
 
 3. **配置环境变量** (可选)
    创建`.env`文件，根据需要配置以下环境变量：
+
    ```
    # Gemini API密钥，用于代码智能补全和错误提示
    GEMINI_API_KEY=your_api_key_here
    ```
 
 4. **启动开发服务器**
+
    ```bash
    npm run dev
    ```
@@ -197,4 +207,4 @@ npm start
 
 **极简编译器 - 让编程更简单**
 
-*最后更新时间：2024年11月*
+_最后更新时间：2024年11月_
