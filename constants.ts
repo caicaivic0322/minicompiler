@@ -20,17 +20,25 @@ const getWindowOrigin = () => {
 };
 
 export const buildApiUrl = (path: string) => {
-  const envBase = normalizeApiBase((import.meta as any).env?.VITE_API_BASE_URL);
-  
-  // In production (Render), always use relative paths if VITE_API_BASE_URL is not set.
-  // This avoids CORS issues and URL pattern mismatches.
-  if (!envBase) {
-    return path.startsWith('/') ? path : `/${path}`;
-  }
-  
+  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${envBase}${normalizedPath}`;
+
+  // 1. If explicitly set in environment variables (Vite build time), use it.
+  if (envBase && envBase.trim()) {
+    return `${envBase.trim()}${normalizedPath}`;
+  }
+
+  // 2. Local Development (Vite Proxy handles /api)
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return normalizedPath;
+  }
+
+  // 3. Absolute Fallback for Production (Render)
+  // Hardcoding this avoids any 'pattern' mismatch errors in fetch.
+  return `https://minicompiler-api.onrender.com${normalizedPath}`;
 };
+
+
 
 
 export const DEFAULT_PYTHON_CODE = `print("Hello, World!")`;
