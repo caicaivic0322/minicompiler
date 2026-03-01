@@ -95,8 +95,9 @@ function App() {
         .then(() => {
           setRuntimeStatus(prev => {
             if (prev.cpp) return prev;
-            addLog('system', 'C++ (JSCPP) runtime ready.');
+            addLog('system', 'C++ (Piston API) ready.');
             return { ...prev, cpp: true };
+
           });
         })
         .catch(err => {

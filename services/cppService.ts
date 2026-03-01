@@ -1,29 +1,8 @@
-// JSCPP is loaded via <script> tag in index.html, exposed as window.JSCPP
-declare const JSCPP: any;
-
-let jscppReady = false;
+import { buildApiUrl } from '../constants';
 
 export const initCpp = async (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    if (typeof JSCPP !== 'undefined') {
-      jscppReady = true;
-      resolve();
-      return;
-    }
-    // Poll briefly in case the script is still loading
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (typeof JSCPP !== 'undefined') {
-        clearInterval(interval);
-        jscppReady = true;
-        resolve();
-      } else if (attempts > 20) {
-        clearInterval(interval);
-        reject(new Error('JSCPP load timeout'));
-      }
-    }, 200);
-  });
+  // Piston API via Proxy is stateless and doesn't need initialization, but we keep this for interface compatibility
+  return Promise.resolve();
 };
 
 export const runCppCode = async (
@@ -31,34 +10,48 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
-  if (!jscppReady) {
-    try {
-      await initCpp();
-    } catch (e: any) {
-      onOutput(`[Error] C++ runtime not ready: ${e.message}\n`);
+  onOutput(`[System] Sending code to backend for compilation and execution...\n`);
+
+  try {
+    const apiUrl = buildApiUrl('/api/compile/cpp');
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        stdin,
+      }),
+    });
+
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      onOutput(`\n[Error] API Request failed: ${response.status} ${response.statusText}\n${errorText}`);
       return;
     }
-  }
 
-  return new Promise<void>((resolve) => {
-    try {
-      const exitCode = JSCPP.run(code, stdin, {
-        stdio: {
-          write: (s: string) => {
-            onOutput(s);
-          },
-        },
-        unsigned_overflow: 'error',
-        maxExecutionSteps: 10_000_000,
-      });
+    const result = await response.json();
 
-      if (exitCode !== 0) {
-        onOutput(`\n[System] Process exited with code ${exitCode}`);
-      }
-    } catch (err: any) {
-      const msg = err?.message || String(err);
-      onOutput(`\n[Error] ${msg}`);
+    if (result.compile && result.compile.stderr) {
+      onOutput(`[Compile Error]\n${result.compile.stderr}\n`);
     }
-    resolve();
-  });
+
+    if (result.run) {
+      if (result.run.stdout) {
+        onOutput(result.run.stdout);
+      }
+      if (result.run.stderr) {
+        onOutput(`\n[Runtime Error]\n${result.run.stderr}\n`);
+      }
+      if (result.run.code !== 0) {
+        onOutput(`\n[System] Process exited with code ${result.run.code}\n`);
+      }
+    }
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    onOutput(`\n[Error] ${msg}`);
+  }
 };
+

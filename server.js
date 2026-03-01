@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5001;
 app.set('trust proxy', 1);
 
 // 解析 JSON 请求体
@@ -35,29 +35,34 @@ app.use((req, res, next) => {
   next();
 });
 
+const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
+const PISTON_API_KEY = process.env.PISTON_API_KEY; // Set this in your Render dashboard environment variables
+
 // C++ 编译执行 API (代理到 Piston)
 app.post('/api/compile/cpp', async (req, res) => {
   const { code, stdin } = req.body;
 
-  console.log('[C++ Compile] Forwarding to Piston API...');
+  console.log('[C++ Compile] Forwarding to Piston API via Proxy...');
 
   try {
     if (!code) {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+    const response = await fetch(PISTON_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': PISTON_API_KEY,
       },
       body: JSON.stringify({
         language: 'cpp',
         version: '10.2.0',
-        files: [{ content: code }],
+        files: [{ name: 'main.cpp', content: code }],
         stdin: stdin
       }),
     });
+
 
     if (!response.ok) {
       const errorText = await response.text();
