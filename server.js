@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 });
 
 const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
-const PISTON_API_KEY = process.env.PISTON_API_KEY; // Set this in your Render dashboard environment variables
+const PISTON_API_KEY = (process.env.PISTON_API_KEY || '').trim(); // Trim to avoid invisible character errors
 
 // C++ 编译执行 API (代理到 Piston)
 app.post('/api/compile/cpp', async (req, res) => {

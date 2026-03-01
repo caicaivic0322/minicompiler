@@ -21,11 +21,17 @@ const getWindowOrigin = () => {
 
 export const buildApiUrl = (path: string) => {
   const envBase = normalizeApiBase((import.meta as any).env?.VITE_API_BASE_URL);
-  const base = envBase || getWindowOrigin() || DEFAULT_API_BASE_URL;
-  if (!base) return path;
+  
+  // In production (Render), always use relative paths if VITE_API_BASE_URL is not set.
+  // This avoids CORS issues and URL pattern mismatches.
+  if (!envBase) {
+    return path.startsWith('/') ? path : `/${path}`;
+  }
+  
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
+  return `${envBase}${normalizedPath}`;
 };
+
 
 export const DEFAULT_PYTHON_CODE = `print("Hello, World!")`;
 
