@@ -24,7 +24,7 @@ function App() {
 
   // Tab State
   const [tabs, setTabs] = useState<EditorTab[]>([
-    { id: '1', title: 'main.cpp', code: SNIPPETS[Language.CPP], language: Language.CPP }
+    { id: '1', title: 'main.py', code: SNIPPETS[Language.PYTHON], language: Language.PYTHON }
   ]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
 
