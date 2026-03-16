@@ -17,6 +17,20 @@ interface CompileResponse {
   error?: string;
 }
 
+const DEFAULT_PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
+
+const getPistonApiUrl = () => {
+  const envUrl = (import.meta as any).env?.VITE_PISTON_API_URL;
+  const raw = typeof envUrl === 'string' ? envUrl.trim() : '';
+  return raw || DEFAULT_PISTON_API_URL;
+};
+
+const getPistonApiKey = () => {
+  const envKey = (import.meta as any).env?.VITE_PISTON_API_KEY;
+  const raw = typeof envKey === 'string' ? envKey.trim() : '';
+  return raw || '';
+};
+
 
 export const initCpp = async (): Promise<void> => {
   return Promise.resolve();
@@ -27,17 +41,22 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
-  onOutput(`[System] Sending code to backend for compilation and execution...\n`);
+  onOutput(`[System] Sending code to Piston for compilation and execution...\n`);
 
   try {
-    const response = await fetch('/api/compile/cpp', {
+    const apiUrl = getPistonApiUrl();
+    const apiKey = getPistonApiKey();
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
+        ...(apiKey ? { Authorization: apiKey } : {}),
       },
       body: JSON.stringify({
-        code,
-        stdin,
+        language: 'cpp',
+        version: '10.2.0',
+        files: [{ name: 'main.cpp', content: code }],
+        stdin: stdin,
       }),
     });
 
