@@ -5,7 +5,7 @@ import Console from './components/Console';
 import TabBar from './components/TabBar';
 import SaveModal from './components/SaveModal';
 import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet } from './types';
-import { SNIPPETS, THEMES, buildApiUrl } from './constants';
+import { SNIPPETS, THEMES } from './constants';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
 
@@ -120,20 +120,6 @@ function App() {
 
     addLog('system', 'Initializing compilers...');
     initializeRuntimes();
-
-    // Check Server Health
-    fetch(buildApiUrl('/api/health'))
-      .then(res => {
-        if (!res.ok) return null;
-        return res.json();
-      })
-      .then(data => {
-        if (!data) return;
-        addLog('system', `Server Status: ${data.status} (v${data.version})`);
-      })
-      .catch(() => {
-        // Keep output clean if server health check fails (e.g. no backend running).
-      });
 
   }, []);
 

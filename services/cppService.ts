@@ -1,7 +1,13 @@
-import { buildApiUrl } from '../constants';
+const DEFAULT_PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
+
+const getPistonApiUrl = () => {
+  const envUrl = (import.meta as any).env?.VITE_PISTON_API_URL;
+  const raw = typeof envUrl === 'string' ? envUrl.trim() : '';
+  return raw || DEFAULT_PISTON_API_URL;
+};
+
 
 export const initCpp = async (): Promise<void> => {
-  // Piston API via Proxy is stateless and doesn't need initialization, but we keep this for interface compatibility
   return Promise.resolve();
 };
 
@@ -10,18 +16,20 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
-  onOutput(`[System] Sending code to backend for compilation and execution...\n`);
+  onOutput(`[System] Sending code to Piston for compilation and execution...\n`);
 
   try {
-    const apiUrl = buildApiUrl('/api/compile/cpp');
+    const apiUrl = getPistonApiUrl();
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({
-        code,
-        stdin,
+        language: 'cpp',
+        version: '10.2.0',
+        files: [{ name: 'main.cpp', content: code }],
+        stdin: stdin,
       }),
     });
 
@@ -33,6 +41,11 @@ export const runCppCode = async (
     }
 
     const result = await response.json();
+
+    if (result.message) {
+      onOutput(`\n[Error] ${result.message}\n`);
+      return;
+    }
 
     if (result.compile && result.compile.stderr) {
       onOutput(`[Compile Error]\n${result.compile.stderr}\n`);
@@ -54,4 +67,3 @@ export const runCppCode = async (
     onOutput(`\n[Error] ${msg}`);
   }
 };
-
