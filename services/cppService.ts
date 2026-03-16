@@ -6,6 +6,12 @@ const getPistonApiUrl = () => {
   return raw || DEFAULT_PISTON_API_URL;
 };
 
+const getPistonApiKey = () => {
+  const envKey = (import.meta as any).env?.VITE_PISTON_API_KEY;
+  const raw = typeof envKey === 'string' ? envKey.trim() : '';
+  return raw || '';
+};
+
 
 export const initCpp = async (): Promise<void> => {
   return Promise.resolve();
@@ -20,10 +26,12 @@ export const runCppCode = async (
 
   try {
     const apiUrl = getPistonApiUrl();
+    const apiKey = getPistonApiKey();
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
+        ...(apiKey ? { Authorization: apiKey } : {}),
       },
       body: JSON.stringify({
         language: 'cpp',
@@ -64,6 +72,10 @@ export const runCppCode = async (
     }
   } catch (err: any) {
     const msg = err?.message || String(err);
+    if (msg === 'Load failed' || msg === 'Failed to fetch') {
+      onOutput(`\n[Error] ${msg}\nThis is usually caused by CORS/preflight being blocked. If you are using VITE_PISTON_API_KEY, check whether Piston allows browser requests with Authorization header.\n`);
+      return;
+    }
     onOutput(`\n[Error] ${msg}`);
   }
 };
