@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - PORT=5001
+      - PISTON_API_KEY=${PISTON_API_KEY}
+    expose:
+      - "5001"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped

@@ -1,16 +1,21 @@
-const DEFAULT_PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
-
-const getPistonApiUrl = () => {
-  const envUrl = (import.meta as any).env?.VITE_PISTON_API_URL;
-  const raw = typeof envUrl === 'string' ? envUrl.trim() : '';
-  return raw || DEFAULT_PISTON_API_URL;
-};
-
-const getPistonApiKey = () => {
-  const envKey = (import.meta as any).env?.VITE_PISTON_API_KEY;
-  const raw = typeof envKey === 'string' ? envKey.trim() : '';
-  return raw || '';
-};
+interface CompileResponse {
+  compile?: {
+    stdout?: string;
+    stderr?: string;
+    code?: number;
+    signal?: string | null;
+    output?: string;
+  };
+  run?: {
+    stdout?: string;
+    stderr?: string;
+    code?: number;
+    signal?: string | null;
+    output?: string;
+  };
+  message?: string;
+  error?: string;
+}
 
 
 export const initCpp = async (): Promise<void> => {
@@ -22,22 +27,17 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
-  onOutput(`[System] Sending code to Piston for compilation and execution...\n`);
+  onOutput(`[System] Sending code to backend for compilation and execution...\n`);
 
   try {
-    const apiUrl = getPistonApiUrl();
-    const apiKey = getPistonApiKey();
-    const response = await fetch(apiUrl, {
+    const response = await fetch('/api/compile/cpp', {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
-        ...(apiKey ? { Authorization: apiKey } : {}),
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        language: 'cpp',
-        version: '10.2.0',
-        files: [{ name: 'main.cpp', content: code }],
-        stdin: stdin,
+        code,
+        stdin,
       }),
     });
 
@@ -48,7 +48,7 @@ export const runCppCode = async (
       return;
     }
 
-    const result = await response.json();
+    const result: CompileResponse = await response.json();
 
     if (result.message) {
       onOutput(`\n[Error] ${result.message}\n`);
@@ -66,16 +66,12 @@ export const runCppCode = async (
       if (result.run.stderr) {
         onOutput(`\n[Runtime Error]\n${result.run.stderr}\n`);
       }
-      if (result.run.code !== 0) {
+      if (typeof result.run.code === 'number' && result.run.code !== 0) {
         onOutput(`\n[System] Process exited with code ${result.run.code}\n`);
       }
     }
   } catch (err: any) {
     const msg = err?.message || String(err);
-    if (msg === 'Load failed' || msg === 'Failed to fetch') {
-      onOutput(`\n[Error] ${msg}\nThis is usually caused by CORS/preflight being blocked. If you are using VITE_PISTON_API_KEY, check whether Piston allows browser requests with Authorization header.\n`);
-      return;
-    }
     onOutput(`\n[Error] ${msg}`);
   }
 };
