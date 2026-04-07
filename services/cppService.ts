@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../constants';
+
 interface CompileResponse {
   compile?: {
     stdout?: string;
@@ -30,7 +32,8 @@ export const runCppCode = async (
   onOutput(`[System] Sending code to backend for compilation and execution...\n`);
 
   try {
-    const response = await fetch('/api/compile/cpp', {
+    const apiUrl = buildApiUrl('/api/compile/cpp');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
