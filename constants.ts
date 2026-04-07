@@ -5,8 +5,14 @@ const normalizeApiBase = (value?: string) => {
   if (!value) return '';
   const trimmed = value.trim();
   if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, '');
-  if (trimmed.startsWith('/')) return trimmed.replace(/\/$/, '');
+
+  // Render env values are sometimes saved with surrounding quotes by mistake.
+  const unquoted = trimmed.replace(/^['"]|['"]$/g, '');
+  if (!unquoted) return '';
+
+  if (/^https?:\/\//i.test(unquoted)) return unquoted.replace(/\/$/, '');
+  if (unquoted.startsWith('/')) return unquoted.replace(/\/$/, '');
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(:\d+)?$/i.test(unquoted)) return `https://${unquoted}`.replace(/\/$/, '');
   return '';
 };
 
@@ -22,10 +28,11 @@ const getWindowOrigin = () => {
 export const buildApiUrl = (path: string) => {
   const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const normalizedEnvBase = normalizeApiBase(envBase);
 
   // 1. If explicitly set in environment variables (Vite build time), use it.
-  if (envBase && envBase.trim()) {
-    return `${envBase.trim()}${normalizedPath}`;
+  if (normalizedEnvBase) {
+    return `${normalizedEnvBase}${normalizedPath}`;
   }
 
   // 2. Local Development (Vite Proxy handles /api)
@@ -35,7 +42,7 @@ export const buildApiUrl = (path: string) => {
 
   // 3. Absolute Fallback for Production (Render)
   // Hardcoding this avoids any 'pattern' mismatch errors in fetch.
-  return `https://minicompiler-api.onrender.com${normalizedPath}`;
+  return `${DEFAULT_API_BASE_URL}${normalizedPath}`;
 };
 
 
