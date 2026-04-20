@@ -36,9 +36,24 @@ export const runPythonCode = async (code: string, stdin: string, onOutput: (text
     await initPyodide();
   }
 
-  // Reset stdout redirection
-  pyodideInstance.setStdout({ batched: (msg: string) => onOutput(msg + "\n") });
-  pyodideInstance.setStderr({ batched: (msg: string) => onOutput(msg + "\n") });
+  const stdoutDecoder = new TextDecoder();
+  const stderrDecoder = new TextDecoder();
+  const flushDecoder = (decoder: TextDecoder) => {
+    const remaining = decoder.decode();
+    if (remaining) onOutput(remaining);
+  };
+
+  // Use raw handlers so output without a trailing newline is not lost.
+  pyodideInstance.setStdout({
+    raw: (charCode: number) => {
+      onOutput(stdoutDecoder.decode(new Uint8Array([charCode]), { stream: true }));
+    }
+  });
+  pyodideInstance.setStderr({
+    raw: (charCode: number) => {
+      onOutput(stderrDecoder.decode(new Uint8Array([charCode]), { stream: true }));
+    }
+  });
 
   try {
     let inputIndex = 0;
@@ -58,5 +73,16 @@ export const runPythonCode = async (code: string, stdin: string, onOutput: (text
     await pyodideInstance.runPythonAsync(code);
   } catch (error: any) {
     onOutput(`Error: ${error.message}`);
+  } finally {
+    try {
+      await pyodideInstance.runPythonAsync(`
+import sys
+sys.stdout.flush()
+sys.stderr.flush()
+`);
+    } finally {
+      flushDecoder(stdoutDecoder);
+      flushDecoder(stderrDecoder);
+    }
   }
 };

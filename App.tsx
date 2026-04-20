@@ -95,7 +95,7 @@ function App() {
         .then(() => {
           setRuntimeStatus(prev => {
             if (prev.cpp) return prev;
-            addLog('system', 'C++ (Piston API) ready.');
+            addLog('system', 'C++ runtime ready.');
             return { ...prev, cpp: true };
 
           });
@@ -312,9 +312,16 @@ function App() {
           await initPyodide();
         }
         addLog('system', `>> Executing ${activeTab.title} (Python)...`);
+        let pythonBuffer = '';
         await runPythonCode(currentCode, stdin, (text) => {
-          if (text.trim() !== '') addLog('info', text.trimEnd());
+          pythonBuffer += text;
+          const lines = pythonBuffer.split('\n');
+          pythonBuffer = lines.pop() ?? '';
+          for (const line of lines) {
+            addLog('info', line);
+          }
         });
+        if (pythonBuffer) addLog('info', pythonBuffer);
       } else if (currentLang === Language.CPP) {
         if (!runtimeStatus.cpp) {
           addLog('system', 'Ensuring C++ runtime is loaded...');

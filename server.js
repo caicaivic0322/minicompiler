@@ -35,8 +35,56 @@ app.use((req, res, next) => {
   next();
 });
 
-const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
+const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston/execute';
 const PISTON_API_KEY = (process.env.PISTON_API_KEY || '').trim(); // Trim to avoid invisible character errors
+const PISTON_TIMEOUT_MS = Number(process.env.PISTON_TIMEOUT_MS || 12000);
+const PISTON_CACHE_TTL_MS = Number(process.env.PISTON_CACHE_TTL_MS || 5 * 60 * 1000);
+const PISTON_CACHE_MAX_ENTRIES = Number(process.env.PISTON_CACHE_MAX_ENTRIES || 100);
+const pistonCache = new Map();
+
+const getCacheKey = (code, stdin) => JSON.stringify({ code, stdin: stdin || '' });
+
+const getCachedResult = (cacheKey) => {
+  const cached = pistonCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (Date.now() > cached.expiresAt) {
+    pistonCache.delete(cacheKey);
+    return null;
+  }
+
+  pistonCache.delete(cacheKey);
+  pistonCache.set(cacheKey, cached);
+  return cached.result;
+};
+
+const setCachedResult = (cacheKey, result) => {
+  if (PISTON_CACHE_TTL_MS <= 0 || PISTON_CACHE_MAX_ENTRIES <= 0) return;
+
+  pistonCache.set(cacheKey, {
+    result,
+    expiresAt: Date.now() + PISTON_CACHE_TTL_MS,
+  });
+
+  while (pistonCache.size > PISTON_CACHE_MAX_ENTRIES) {
+    const oldestKey = pistonCache.keys().next().value;
+    pistonCache.delete(oldestKey);
+  }
+};
+
+const fetchWithTimeout = async (url, options, timeoutMs) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 // C++ 编译执行 API (代理到 Piston)
 app.post('/api/compile/cpp', async (req, res) => {
@@ -49,19 +97,30 @@ app.post('/api/compile/cpp', async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    const response = await fetch(PISTON_API_URL, {
+    const cacheKey = getCacheKey(code, stdin);
+    const cachedResult = getCachedResult(cacheKey);
+    if (cachedResult) {
+      res.setHeader('X-Compiler-Cache', 'HIT');
+      return res.json(cachedResult);
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (PISTON_API_KEY) {
+      headers.Authorization = PISTON_API_KEY;
+    }
+
+    const response = await fetchWithTimeout(PISTON_API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': PISTON_API_KEY,
-      },
+      headers,
       body: JSON.stringify({
         language: 'cpp',
         version: '10.2.0',
         files: [{ name: 'main.cpp', content: code }],
         stdin: stdin
       }),
-    });
+    }, PISTON_TIMEOUT_MS);
 
 
     if (!response.ok) {
@@ -76,6 +135,8 @@ app.post('/api/compile/cpp', async (req, res) => {
     } catch (err) {
       return res.status(502).json({ error: 'Invalid JSON from Piston', raw: rawText });
     }
+    setCachedResult(cacheKey, result);
+    res.setHeader('X-Compiler-Cache', 'MISS');
     res.json(result);
   } catch (error) {
     console.log('[C++ Compile] Error:', error.message);
