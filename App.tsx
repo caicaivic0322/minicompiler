@@ -8,13 +8,14 @@ import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet } from '.
 import { SNIPPETS, THEMES } from './constants';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
-import { EDITOR_SESSION_STORAGE_KEY, parseEditorSession, serializeEditorSession } from './services/sessionPersistence';
+import { EDITOR_SESSION_STORAGE_KEY, parseEditorSession, preferPythonStartupSession, serializeEditorSession } from './services/sessionPersistence';
 
 const CodeEditor = lazy(() => import('./components/Editor'));
 
 const DEFAULT_TABS: EditorTab[] = [
   { id: '1', title: 'main.py', code: SNIPPETS[Language.PYTHON], language: Language.PYTHON }
 ];
+const DEFAULT_PYTHON_TAB = DEFAULT_TABS[0];
 
 const loadInitialSession = () => {
   if (typeof window === 'undefined') {
@@ -23,7 +24,7 @@ const loadInitialSession = () => {
 
   try {
     const savedSession = parseEditorSession(window.localStorage.getItem(EDITOR_SESSION_STORAGE_KEY));
-    if (savedSession) return savedSession;
+    if (savedSession) return preferPythonStartupSession(savedSession, DEFAULT_PYTHON_TAB);
   } catch (error) {
     console.warn('Failed to restore editor session:', error);
   }

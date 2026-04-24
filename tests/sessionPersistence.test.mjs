@@ -58,3 +58,57 @@ test('parseEditorSession rejects invalid saved data and repairs a missing active
   assert.equal(repaired.activeTabId, 'a');
   assert.equal(repaired.stdin, 'input');
 });
+
+test('preferPythonStartupSession activates an existing Python tab on page load', async () => {
+  const { preferPythonStartupSession } = await importTypeScriptModule(
+    new URL('../services/sessionPersistence.ts', import.meta.url),
+  );
+
+  const session = {
+    version: 1,
+    tabs: [
+      { id: 'cpp', title: 'main.cpp', code: 'int main(){}', language: 'cpp' },
+      { id: 'py', title: 'main.py', code: 'print(1)', language: 'python' },
+    ],
+    activeTabId: 'cpp',
+    stdin: '',
+  };
+
+  const preferred = preferPythonStartupSession(session, {
+    id: 'default-python',
+    title: 'main.py',
+    code: 'print("Hello, World!")',
+    language: 'python',
+  });
+
+  assert.equal(preferred.activeTabId, 'py');
+  assert.deepEqual(preferred.tabs, session.tabs);
+});
+
+test('preferPythonStartupSession adds a Python tab when saved tabs are C++ only', async () => {
+  const { preferPythonStartupSession } = await importTypeScriptModule(
+    new URL('../services/sessionPersistence.ts', import.meta.url),
+  );
+
+  const preferred = preferPythonStartupSession({
+    version: 1,
+    tabs: [
+      { id: '1', title: 'a.cpp', code: 'int main(){}', language: 'cpp' },
+      { id: '2', title: 'b.cpp', code: 'int main(){}', language: 'cpp' },
+      { id: '3', title: 'c.cpp', code: 'int main(){}', language: 'cpp' },
+    ],
+    activeTabId: '2',
+    stdin: '7',
+  }, {
+    id: '1',
+    title: 'main.py',
+    code: 'print("Hello, World!")',
+    language: 'python',
+  });
+
+  assert.equal(preferred.tabs[0].language, 'python');
+  assert.equal(preferred.tabs[0].id, 'python-startup');
+  assert.equal(preferred.activeTabId, 'python-startup');
+  assert.equal(preferred.tabs.length, 3);
+  assert.equal(preferred.stdin, '7');
+});
