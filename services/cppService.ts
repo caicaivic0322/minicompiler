@@ -32,6 +32,10 @@ const LOCAL_TIMEOUT_MS = 5000;
 let jscppLoadPromise: Promise<void> | null = null;
 
 const getJscpp = () => (globalThis as any).JSCPP;
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+const formatDuration = (durationMs: number) => {
+  return `${durationMs < 100 ? durationMs.toFixed(1) : durationMs.toFixed(0)}ms`;
+};
 
 const canUseLocalCppRunner = () => {
   return (
@@ -150,16 +154,23 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
+  const localStart = now();
   const localResult = await runCppLocally(code, stdin);
+  const localDuration = now() - localStart;
   if (localResult.ok) {
+    onOutput(`[System] C++ runner: Local JSCPP (${formatDuration(localDuration)}).\n`);
     onOutput(localResult.output);
     return;
   }
 
-  onOutput(`[System] Local C++ runner unavailable or unsupported. Falling back to backend...\n`);
+  const localReason = localResult.error || 'unsupported code path';
+  onOutput(
+    `[System] C++ runner: Render/Piston fallback (Local JSCPP unavailable: ${localReason}; local attempt ${formatDuration(localDuration)}).\n`,
+  );
 
   try {
     const apiUrl = buildApiUrl('/api/compile/cpp');
+    const backendStart = now();
     const response = await fetchWithTimeout(apiUrl, {
       method: 'POST',
       headers: {
@@ -182,6 +193,8 @@ export const runCppCode = async (
     if (result.message) {
       throw new Error(result.message);
     }
+
+    onOutput(`[System] Backend response: ${formatDuration(now() - backendStart)}.\n`);
 
     let hasFailure = false;
 
