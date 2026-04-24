@@ -1,6 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ConsoleMessage } from '../types';
-import { Terminal, Eraser, ZoomIn, ZoomOut } from 'lucide-react';
+import { Terminal, Eraser, ZoomIn, ZoomOut, ChevronDown } from 'lucide-react';
+import { getConsoleMessageGroups } from './consoleMessages';
 
 interface ConsoleProps {
   messages: ConsoleMessage[];
@@ -20,13 +21,15 @@ const Console: React.FC<ConsoleProps> = ({
   onFontDecrease
 }) => {
   const endRef = useRef<HTMLDivElement>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const { visibleMessages, diagnosticMessages } = getConsoleMessageGroups(messages, showDiagnostics);
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
     if (endRef.current) {
       endRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [visibleMessages, showDiagnostics]);
 
   return (
     <div className="flex flex-col h-full bg-surface border border-border rounded-lg shadow-xl overflow-hidden transition-colors duration-300">
@@ -73,9 +76,24 @@ const Console: React.FC<ConsoleProps> = ({
           </div>
         )}
 
-        {messages.map((msg, idx) => (
+        {diagnosticMessages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDiagnostics(prev => !prev)}
+            className="w-full flex items-center gap-2 text-left text-secondary hover:text-primary px-3 py-1.5 rounded-md border border-border/60 bg-background/30 hover:bg-background/60 transition-colors"
+            aria-expanded={showDiagnostics}
+          >
+            <ChevronDown
+              size={14}
+              className={`transition-transform ${showDiagnostics ? 'rotate-180' : ''}`}
+            />
+            <span>运行诊断 ({diagnosticMessages.length})</span>
+          </button>
+        )}
+
+        {visibleMessages.map((msg, idx) => (
           <div 
-            key={idx} 
+            key={`${msg.timestamp}-${idx}`}
             className={`whitespace-pre-wrap break-words px-3 py-1.5 rounded-md transition-all ${
               msg.type === 'error' 
                 ? 'text-error bg-error/10 border-l-2 border-error' 
