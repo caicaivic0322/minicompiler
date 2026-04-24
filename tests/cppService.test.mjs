@@ -19,38 +19,30 @@ async function importTypeScriptModule(path) {
   return import(`data:text/javascript;base64,${encoded}`);
 }
 
-test('runCppCode uses the local JSCPP runner before calling the backend', async () => {
+test('runCppCode always sends code to the backend Piston proxy', async () => {
   delete globalThis.JSCPP;
-  let scriptElement;
+  let backendCalls = 0;
+
   globalThis.document = {
     createElement() {
-      scriptElement = {};
-      return scriptElement;
-    },
-    body: {
-      appendChild(node) {
-        queueMicrotask(() => {
-          globalThis.JSCPP = {
-            WebWorkerHelper: class {
-              run(_code, _stdin, options, callback) {
-                options.stdio.write('Hello from local JSCPP\n');
-                callback(null);
-              }
-              worker = { terminate() {} };
-            },
-          };
-          node.onload?.({});
-        });
-        return node;
-      },
+      throw new Error('local JSCPP should not be loaded');
     },
   };
   globalThis.window = {
     location: { origin: 'http://127.0.0.1:3000' },
   };
   globalThis.Worker = class {};
-  globalThis.fetch = async () => {
-    throw new Error('backend should not be called');
+  globalThis.fetch = async (url, options) => {
+    backendCalls += 1;
+    assert.equal(url, '/api/compile/cpp');
+    assert.deepEqual(JSON.parse(options.body), {
+      code: 'int main(){ return 0; }',
+      stdin: '',
+    });
+    return {
+      ok: true,
+      json: async () => ({ run: { stdout: 'Hello from backend\n', code: 0 } }),
+    };
   };
 
   const { runCppCode } = await importTypeScriptModule(
@@ -60,52 +52,9 @@ test('runCppCode uses the local JSCPP runner before calling the backend', async 
 
   await runCppCode('int main(){ return 0; }', '', (text) => output.push(text));
 
-  assert.equal(scriptElement.src, '/libs/JSCPP.es5.min.js');
-  assert.match(output.join(''), /C\+\+ runner: Local JSCPP/);
-  assert.match(output.join(''), /Hello from local JSCPP/);
-});
-
-test('runCppCode labels backend fallback when local JSCPP cannot run the code', async () => {
-  delete globalThis.JSCPP;
-  globalThis.document = {
-    createElement() {
-      return {};
-    },
-    body: {
-      appendChild(node) {
-        queueMicrotask(() => {
-          globalThis.JSCPP = {
-            WebWorkerHelper: class {
-              run(_code, _stdin, _options, callback) {
-                callback(new Error('unsupported syntax'));
-              }
-              worker = { terminate() {} };
-            },
-          };
-          node.onload?.({});
-        });
-        return node;
-      },
-    },
-  };
-  globalThis.window = {
-    location: { origin: 'http://127.0.0.1:3000' },
-  };
-  globalThis.Worker = class {};
-  globalThis.fetch = async () => ({
-    ok: true,
-    json: async () => ({ run: { stdout: 'Hello from backend\n', code: 0 } }),
-  });
-
-  const { runCppCode } = await importTypeScriptModule(
-    new URL('../services/cppService.ts', import.meta.url),
-  );
-  const output = [];
-
-  await runCppCode('int main(){ return 0; }', '', (text) => output.push(text));
-
-  assert.match(output.join(''), /C\+\+ runner: Render\/Piston fallback/);
-  assert.match(output.join(''), /Local JSCPP unavailable: unsupported syntax/);
+  assert.equal(backendCalls, 1);
+  assert.match(output.join(''), /C\+\+ runner: Render\/Piston/);
   assert.match(output.join(''), /Backend response:/);
   assert.match(output.join(''), /Hello from backend/);
+  assert.doesNotMatch(output.join(''), /Local JSCPP/);
 });

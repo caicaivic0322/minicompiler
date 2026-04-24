@@ -19,116 +19,11 @@ interface CompileResponse {
   error?: string;
 }
 
-interface LocalCppResult {
-  ok: boolean;
-  output: string;
-  error?: string;
-}
-
-const JSCPP_SCRIPT_PATH = '/libs/JSCPP.es5.min.js';
 const BACKEND_TIMEOUT_MS = 12000;
-const LOCAL_TIMEOUT_MS = 5000;
 
-let jscppLoadPromise: Promise<void> | null = null;
-
-const getJscpp = () => (globalThis as any).JSCPP;
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const formatDuration = (durationMs: number) => {
   return `${durationMs < 100 ? durationMs.toFixed(1) : durationMs.toFixed(0)}ms`;
-};
-
-const canUseLocalCppRunner = () => {
-  return (
-    typeof document !== 'undefined' &&
-    typeof Worker !== 'undefined' &&
-    typeof window !== 'undefined'
-  );
-};
-
-const loadJscpp = async (): Promise<void> => {
-  if (getJscpp()?.WebWorkerHelper) return;
-
-  if (!jscppLoadPromise) {
-    jscppLoadPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = JSCPP_SCRIPT_PATH;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load local C++ runner.'));
-      document.body.appendChild(script);
-    });
-  }
-
-  await jscppLoadPromise;
-
-  if (!getJscpp()?.WebWorkerHelper) {
-    throw new Error('Local C++ runner is unavailable.');
-  }
-};
-
-const runCppLocally = async (code: string, stdin: string): Promise<LocalCppResult> => {
-  if (!canUseLocalCppRunner()) {
-    return { ok: false, output: '', error: 'Local C++ runner requires a browser Worker.' };
-  }
-
-  try {
-    await loadJscpp();
-  } catch (err: any) {
-    return { ok: false, output: '', error: err?.message || String(err) };
-  }
-
-  return new Promise((resolve) => {
-    const output: string[] = [];
-    let settled = false;
-    let runner: any = null;
-
-    const finish = (result: LocalCppResult) => {
-      if (settled) return;
-      settled = true;
-      if (runner?.worker?.terminate) runner.worker.terminate();
-      resolve(result);
-    };
-
-    const timeout = setTimeout(() => {
-      finish({
-        ok: false,
-        output: output.join(''),
-        error: 'Local C++ execution timed out.',
-      });
-    }, LOCAL_TIMEOUT_MS);
-
-    try {
-      const JSCPP = getJscpp();
-      runner = new JSCPP.WebWorkerHelper(JSCPP_SCRIPT_PATH);
-      runner.run(
-        code,
-        stdin || '',
-        {
-          stdio: {
-            write: (text: string) => output.push(text),
-          },
-        },
-        (err: any) => {
-          clearTimeout(timeout);
-          if (err) {
-            finish({
-              ok: false,
-              output: output.join(''),
-              error: err?.message || String(err),
-            });
-            return;
-          }
-          finish({ ok: true, output: output.join('') });
-        },
-      );
-    } catch (err: any) {
-      clearTimeout(timeout);
-      finish({
-        ok: false,
-        output: output.join(''),
-        error: err?.message || String(err),
-      });
-    }
-  });
 };
 
 const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
@@ -154,19 +49,7 @@ export const runCppCode = async (
   stdin: string,
   onOutput: (text: string) => void
 ): Promise<void> => {
-  const localStart = now();
-  const localResult = await runCppLocally(code, stdin);
-  const localDuration = now() - localStart;
-  if (localResult.ok) {
-    onOutput(`[System] C++ runner: Local JSCPP (${formatDuration(localDuration)}).\n`);
-    onOutput(localResult.output);
-    return;
-  }
-
-  const localReason = localResult.error || 'unsupported code path';
-  onOutput(
-    `[System] C++ runner: Render/Piston fallback (Local JSCPP unavailable: ${localReason}; local attempt ${formatDuration(localDuration)}).\n`,
-  );
+  onOutput(`[System] C++ runner: Render/Piston.\n`);
 
   try {
     const apiUrl = buildApiUrl('/api/compile/cpp');
@@ -222,9 +105,6 @@ export const runCppCode = async (
     }
   } catch (err: any) {
     const msg = err?.message || String(err);
-    if (localResult.error) {
-      onOutput(`[Local Runner Error]\n${localResult.error}\n`);
-    }
     onOutput(`\n[Error] ${msg}`);
     throw err;
   }
