@@ -50,11 +50,13 @@ export const buildApiUrl = (path: string) => {
 
 export const DEFAULT_PYTHON_CODE = `print("Hello, World!")`;
 
-export const DEFAULT_CPP_CODE = `#include <iostream>
+export const DEFAULT_CPP_CODE = `#include <bits/stdc++.h>
 using namespace std;
 
 int main() {
-    cout << "Hello, World!" << endl;
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
     return 0;
 }`;
 
@@ -64,6 +66,169 @@ export const SNIPPETS: Record<Language, string> = {
 };
 
 export const CPP_EXAMPLES: ExampleSnippet[] = [
+  {
+    name: "Contest Starter",
+    language: Language.CPP,
+    code: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n;
+    cin >> n;
+
+    vector<int> a(n);
+    for (int i = 0; i < n; i++) {
+        cin >> a[i];
+    }
+
+    sort(a.begin(), a.end());
+
+    for (int x : a) {
+        cout << x << ' ';
+    }
+    cout << '\\n';
+
+    return 0;
+}`
+  },
+  {
+    name: "Binary Search",
+    language: Language.CPP,
+    code: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, target;
+    cin >> n >> target;
+
+    vector<int> a(n);
+    for (int i = 0; i < n; i++) {
+        cin >> a[i];
+    }
+
+    int left = 0, right = n - 1;
+    int answer = -1;
+
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (a[mid] >= target) {
+            if (a[mid] == target) answer = mid;
+            right = mid - 1;
+        } else {
+            left = mid + 1;
+        }
+    }
+
+    cout << answer << '\\n';
+    return 0;
+}`
+  },
+  {
+    name: "BFS Shortest Path",
+    language: Language.CPP,
+    code: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, m, start;
+    cin >> n >> m >> start;
+
+    vector<vector<int>> graph(n + 1);
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        cin >> u >> v;
+        graph[u].push_back(v);
+        graph[v].push_back(u);
+    }
+
+    vector<int> dist(n + 1, -1);
+    queue<int> q;
+    dist[start] = 0;
+    q.push(start);
+
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+
+        for (int v : graph[u]) {
+            if (dist[v] != -1) continue;
+            dist[v] = dist[u] + 1;
+            q.push(v);
+        }
+    }
+
+    for (int i = 1; i <= n; i++) {
+        cout << dist[i] << ' ';
+    }
+    cout << '\\n';
+
+    return 0;
+}`
+  },
+  {
+    name: "Disjoint Set Union",
+    language: Language.CPP,
+    code: `#include <bits/stdc++.h>
+using namespace std;
+
+struct DSU {
+    vector<int> parent, size;
+
+    DSU(int n) {
+        parent.resize(n + 1);
+        size.assign(n + 1, 1);
+        iota(parent.begin(), parent.end(), 0);
+    }
+
+    int find(int x) {
+        if (parent[x] == x) return x;
+        return parent[x] = find(parent[x]);
+    }
+
+    bool unite(int a, int b) {
+        a = find(a);
+        b = find(b);
+        if (a == b) return false;
+
+        if (size[a] < size[b]) swap(a, b);
+        parent[b] = a;
+        size[a] += size[b];
+        return true;
+    }
+};
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, q;
+    cin >> n >> q;
+
+    DSU dsu(n);
+
+    while (q--) {
+        int type, a, b;
+        cin >> type >> a >> b;
+
+        if (type == 1) {
+            dsu.unite(a, b);
+        } else {
+            cout << (dsu.find(a) == dsu.find(b) ? "YES" : "NO") << '\\n';
+        }
+    }
+
+    return 0;
+}`
+  },
   {
     name: "Hello World",
     language: Language.CPP,
