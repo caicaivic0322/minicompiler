@@ -102,3 +102,43 @@ test('runCppCode explains an unavailable Render backend in Chinese', async () =>
   assert.match(output.join(''), /后端服务暂时不可用/);
   assert.match(output.join(''), /Render/);
 });
+
+test('runCppCode explains Piston whitelist or API key failures', async () => {
+  let callCount = 0;
+  globalThis.window = {
+    location: { origin: 'http://127.0.0.1:3000' },
+  };
+  globalThis.fetch = async () => {
+    callCount += 1;
+    if (callCount === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', version: '1.0.3' }),
+      };
+    }
+
+    return {
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      text: async () => JSON.stringify({
+        error: 'Piston API 未授权（HTTP 401）。请在 Render 配置 PISTON_API_KEY，或把 PISTON_API_URL 指向自建 Piston。',
+        upstreamStatus: 401,
+      }),
+    };
+  };
+
+  const { runCppCode } = await importTypeScriptModule(
+    new URL('../services/cppService.ts', import.meta.url),
+  );
+  const output = [];
+
+  await assert.rejects(
+    runCppCode('int main(){ return 0; }', '', (text) => output.push(text)),
+    /Piston API 未授权/,
+  );
+
+  assert.match(output.join(''), /PISTON_API_KEY/);
+  assert.match(output.join(''), /自建 Piston/);
+});

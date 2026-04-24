@@ -86,6 +86,52 @@ const fetchWithTimeout = async (url, options, timeoutMs) => {
   }
 };
 
+const summarizePistonError = (rawText) => {
+  if (!rawText) return '';
+
+  try {
+    const parsed = JSON.parse(rawText);
+    return parsed.error || parsed.message || rawText;
+  } catch {
+    return rawText;
+  }
+};
+
+const createPistonFailure = (response, rawText) => {
+  const detail = summarizePistonError(rawText);
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      status: 502,
+      body: {
+        error: `Piston API 未授权（HTTP ${response.status}）。公开 Piston API 可能需要白名单或 API Key；请在 Render 配置 PISTON_API_KEY，或把 PISTON_API_URL 指向自建 Piston。${detail ? `\n${detail}` : ''}`,
+        upstreamStatus: response.status,
+        upstreamBody: detail,
+      },
+    };
+  }
+
+  if (response.status === 429) {
+    return {
+      status: 502,
+      body: {
+        error: `Piston API 请求过多（HTTP 429）。请稍后重试，或考虑自建 Piston 服务。${detail ? `\n${detail}` : ''}`,
+        upstreamStatus: response.status,
+        upstreamBody: detail,
+      },
+    };
+  }
+
+  return {
+    status: 502,
+    body: {
+      error: `Piston API 请求失败（HTTP ${response.status} ${response.statusText}）。${detail}`,
+      upstreamStatus: response.status,
+      upstreamBody: detail,
+    },
+  };
+};
+
 // C++ 编译执行 API (代理到 Piston)
 app.post('/api/compile/cpp', async (req, res) => {
   const { code, stdin } = req.body;
@@ -125,7 +171,8 @@ app.post('/api/compile/cpp', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Request Failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`);
+      const failure = createPistonFailure(response, errorText);
+      return res.status(failure.status).json(failure.body);
     }
 
     const rawText = await response.text();

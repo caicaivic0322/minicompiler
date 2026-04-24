@@ -49,8 +49,24 @@ const readResponseText = async (response: Response) => {
   }
 };
 
+const extractErrorDetail = (bodyText: string) => {
+  if (!bodyText) return '';
+
+  try {
+    const parsed = JSON.parse(bodyText);
+    return parsed?.error || parsed?.message || bodyText;
+  } catch {
+    return bodyText;
+  }
+};
+
 const createHttpError = (response: Response, bodyText: string, target: string) => {
-  const details = bodyText ? `\n${bodyText}` : '';
+  const detail = extractErrorDetail(bodyText);
+  const details = detail ? `\n${detail}` : '';
+
+  if (/Piston API 未授权|whitelist|PISTON_API_KEY|PISTON_API_URL/i.test(detail)) {
+    return new Error(detail);
+  }
 
   if (response.status === 503) {
     return new Error(

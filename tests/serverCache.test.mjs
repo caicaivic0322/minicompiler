@@ -62,3 +62,45 @@ test('C++ proxy caches identical Piston executions', async () => {
     await new Promise((resolve) => upstream.close(resolve));
   }
 });
+
+test('C++ proxy surfaces Piston authorization failures clearly', async () => {
+  const upstream = http.createServer((req, res) => {
+    req.resume();
+    res.statusCode = 401;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ message: 'Public Piston API is now whitelist only' }));
+  });
+  const upstreamPort = await listen(upstream);
+
+  const appPort = 25000 + Math.floor(Math.random() * 1000);
+  const app = spawn(process.execPath, ['server.js'], {
+    cwd: new URL('..', import.meta.url),
+    env: {
+      ...process.env,
+      PORT: String(appPort),
+      PISTON_API_URL: `http://127.0.0.1:${upstreamPort}/execute`,
+      PISTON_CACHE_TTL_MS: '60000',
+      PISTON_CACHE_MAX_ENTRIES: '20',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  try {
+    await waitForHealth(`http://127.0.0.1:${appPort}`);
+
+    const response = await fetch(`http://127.0.0.1:${appPort}/api/compile/cpp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: 'int main(){return 0;}', stdin: '' }),
+    });
+
+    assert.equal(response.status, 502);
+    const body = await response.json();
+    assert.equal(body.upstreamStatus, 401);
+    assert.match(body.error, /Piston API 未授权/);
+    assert.match(body.error, /PISTON_API_KEY|PISTON_API_URL/);
+  } finally {
+    app.kill();
+    await new Promise((resolve) => upstream.close(resolve));
+  }
+});
