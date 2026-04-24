@@ -10,7 +10,6 @@ export interface EditorSessionSnapshot {
 }
 
 const MAX_PERSISTED_TABS = 3;
-const PYTHON_STARTUP_TAB_ID = 'python-startup';
 
 const isLanguage = (value: unknown): value is Language => {
   return value === Language.PYTHON || value === Language.CPP;
@@ -77,33 +76,16 @@ export const parseEditorSession = (raw: string | null): EditorSessionSnapshot | 
   }
 };
 
-const createUniquePythonTab = (defaultPythonTab: EditorTab, tabs: EditorTab[]) => {
-  if (!tabs.some((tab) => tab.id === defaultPythonTab.id)) {
-    return defaultPythonTab;
-  }
-
-  return {
-    ...defaultPythonTab,
-    id: PYTHON_STARTUP_TAB_ID,
-  };
-};
-
 export const preferPythonStartupSession = (
   session: EditorSessionSnapshot,
   defaultPythonTab: EditorTab,
 ): EditorSessionSnapshot => {
   const pythonTab = session.tabs.find((tab) => tab.language === Language.PYTHON);
-  if (pythonTab) {
-    return {
-      ...session,
-      activeTabId: pythonTab.id,
-    };
-  }
+  const startupTab = pythonTab || defaultPythonTab;
 
-  const startupTab = createUniquePythonTab(defaultPythonTab, session.tabs);
   return {
     ...session,
-    tabs: [startupTab, ...session.tabs].slice(0, MAX_PERSISTED_TABS),
+    tabs: [startupTab],
     activeTabId: startupTab.id,
   };
 };
