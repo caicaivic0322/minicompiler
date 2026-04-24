@@ -19,12 +19,12 @@ async function importConstants() {
   return import(`data:text/javascript;base64,${encoded}`);
 }
 
-test('default C++ snippet uses an OI/ACM style template', async () => {
+test('default C++ snippet is a simple hello world starter', async () => {
   const { DEFAULT_CPP_CODE } = await importConstants();
 
-  assert.match(DEFAULT_CPP_CODE, /#include <bits\/stdc\+\+\.h>/);
-  assert.match(DEFAULT_CPP_CODE, /ios::sync_with_stdio\(false\);/);
-  assert.match(DEFAULT_CPP_CODE, /cin\.tie\(nullptr\);/);
+  assert.match(DEFAULT_CPP_CODE, /#include <iostream>/);
+  assert.match(DEFAULT_CPP_CODE, /Hello, World!/);
+  assert.doesNotMatch(DEFAULT_CPP_CODE, /#include <bits\/stdc\+\+\.h>/);
 });
 
 test('C++ examples include common contest templates', async () => {

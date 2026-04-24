@@ -50,13 +50,11 @@ export const buildApiUrl = (path: string) => {
 
 export const DEFAULT_PYTHON_CODE = `print("Hello, World!")`;
 
-export const DEFAULT_CPP_CODE = `#include <bits/stdc++.h>
+export const DEFAULT_CPP_CODE = `#include <iostream>
 using namespace std;
 
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-
+    cout << "Hello, World!" << endl;
     return 0;
 }`;
 
