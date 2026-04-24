@@ -51,3 +51,15 @@ test('getConsoleMessageGroups includes diagnostics when expanded', async () => {
     diagnosticMessages: [messages[0]],
   });
 });
+
+test('getCompilerOutputMessageType classifies service diagnostics as system messages', async () => {
+  const { getCompilerOutputMessageType } = await importTypeScriptModule(
+    new URL('../components/consoleMessages.ts', import.meta.url),
+  );
+
+  assert.equal(getCompilerOutputMessageType('[System] C++ runner: Render/Piston.'), 'system');
+  assert.equal(getCompilerOutputMessageType('[System] Backend API: online.'), 'system');
+  assert.equal(getCompilerOutputMessageType('[Compile Error]'), 'error');
+  assert.equal(getCompilerOutputMessageType('[Runtime Error]'), 'error');
+  assert.equal(getCompilerOutputMessageType('Hello, World!'), 'info');
+});

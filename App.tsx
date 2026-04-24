@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Console from './components/Console';
 import TabBar from './components/TabBar';
 import SaveModal from './components/SaveModal';
+import { getCompilerOutputMessageType } from './components/consoleMessages';
 import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet } from './types';
 import { SNIPPETS, THEMES } from './constants';
 import { initPyodide, runPythonCode } from './services/pyodideService';
@@ -91,6 +92,10 @@ function App() {
 
   const handleClearConsole = () => {
     setMessages([]);
+  };
+
+  const addCompilerOutputLine = (line: string) => {
+    addLog(getCompilerOutputMessageType(line), line);
   };
 
   // Apply Theme CSS Variables
@@ -391,10 +396,10 @@ function App() {
           const lines = pythonBuffer.split('\n');
           pythonBuffer = lines.pop() ?? '';
           for (const line of lines) {
-            addLog('info', line);
+            addCompilerOutputLine(line);
           }
         });
-        if (pythonBuffer) addLog('info', pythonBuffer);
+        if (pythonBuffer) addCompilerOutputLine(pythonBuffer);
       } else if (currentLang === Language.CPP) {
         if (!runtimeStatus.cpp) {
           addLog('system', 'Ensuring C++ runtime is loaded...');
@@ -408,11 +413,11 @@ function App() {
           // Keep the last (potentially incomplete) segment in the buffer
           cppBuffer = lines.pop() ?? '';
           for (const line of lines) {
-            addLog('info', line);
+            addCompilerOutputLine(line);
           }
         });
         // Flush any remaining output that didn't end with \n
-        if (cppBuffer) addLog('info', cppBuffer);
+        if (cppBuffer) addCompilerOutputLine(cppBuffer);
       }
 
       const duration = (performance.now() - startTime).toFixed(2);

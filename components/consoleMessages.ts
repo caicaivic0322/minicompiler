@@ -1,5 +1,20 @@
 import { ConsoleMessage } from '../types';
 
+export const getCompilerOutputMessageType = (content: string): ConsoleMessage['type'] => {
+  const trimmed = content.trimStart();
+
+  if (trimmed.startsWith('[System]')) return 'system';
+  if (
+    trimmed.startsWith('[Error]') ||
+    trimmed.startsWith('[Compile Error]') ||
+    trimmed.startsWith('[Runtime Error]')
+  ) {
+    return 'error';
+  }
+
+  return 'info';
+};
+
 export const getConsoleMessageGroups = (
   messages: ConsoleMessage[],
   showDiagnostics: boolean,
