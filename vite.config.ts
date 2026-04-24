@@ -28,7 +28,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      emptyOutDir: true
+      emptyOutDir: true,
+      // Monaco is lazy-loaded after the editor is opened, so its known large chunk is acceptable.
+      chunkSizeWarningLimit: 4000,
     }
   };
 });
