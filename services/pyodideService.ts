@@ -3,6 +3,7 @@ let pyodideLoadPromise: Promise<any> | null = null;
 
 const PYODIDE_VERSION = "v0.25.0";
 const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/${PYODIDE_VERSION}/full/`;
+const PYTHON_TIMEOUT_MS = 5000;
 
 export const initPyodide = async (): Promise<void> => {
   if (pyodideInstance) return;
@@ -29,6 +30,49 @@ export const initPyodide = async (): Promise<void> => {
   }
 
   await pyodideLoadPromise;
+};
+
+const createTimedPythonSource = (code: string, timeoutMs: number) => {
+  const timeoutSeconds = timeoutMs / 1000;
+
+  return `
+import sys as __minicompiler_sys
+import time as __minicompiler_time
+
+__minicompiler_code = ${JSON.stringify(code)}
+__minicompiler_deadline = __minicompiler_time.monotonic() + ${timeoutSeconds}
+__minicompiler_previous_trace = __minicompiler_sys.gettrace()
+
+def __minicompiler_trace(frame, event, arg):
+    if __minicompiler_time.monotonic() > __minicompiler_deadline:
+        raise TimeoutError("Python execution timed out after ${timeoutSeconds} seconds")
+    return __minicompiler_trace
+
+__minicompiler_globals = {
+    "__name__": "__main__",
+    "__file__": "main.py",
+}
+
+__minicompiler_sys.settrace(__minicompiler_trace)
+try:
+    exec(compile(__minicompiler_code, "main.py", "exec"), __minicompiler_globals)
+finally:
+    __minicompiler_sys.settrace(__minicompiler_previous_trace)
+`;
+};
+
+const describePythonError = (error: any) => {
+  const rawMessage = error?.message || String(error);
+
+  if (/EOFError|EOF when reading a line/i.test(rawMessage)) {
+    return '输入不足：程序还在等待 input()，但输入区没有更多内容。请在 Input 区补充输入后重试。';
+  }
+
+  if (/TimeoutError|timed out/i.test(rawMessage)) {
+    return `Python 运行超时（超过 ${Math.round(PYTHON_TIMEOUT_MS / 1000)} 秒）。请检查是否存在死循环，或把任务拆小后再运行。`;
+  }
+
+  return rawMessage;
 };
 
 export const runPythonCode = async (code: string, stdin: string, onOutput: (text: string) => void): Promise<void> => {
@@ -70,9 +114,11 @@ export const runPythonCode = async (code: string, stdin: string, onOutput: (text
     });
 
     // Run user code
-    await pyodideInstance.runPythonAsync(code);
+    await pyodideInstance.runPythonAsync(createTimedPythonSource(code, PYTHON_TIMEOUT_MS));
   } catch (error: any) {
-    onOutput(`Error: ${error.message}`);
+    const friendlyMessage = describePythonError(error);
+    onOutput(`Error: ${friendlyMessage}`);
+    throw new Error('Python execution failed.');
   } finally {
     try {
       await pyodideInstance.runPythonAsync(`

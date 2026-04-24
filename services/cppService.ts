@@ -20,6 +20,7 @@ interface CompileResponse {
 }
 
 const BACKEND_TIMEOUT_MS = 12000;
+const BACKEND_HEALTH_TIMEOUT_MS = 3000;
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const formatDuration = (durationMs: number) => {
@@ -40,6 +41,79 @@ const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: numbe
   }
 };
 
+const readResponseText = async (response: Response) => {
+  try {
+    return await response.text();
+  } catch {
+    return '';
+  }
+};
+
+const createHttpError = (response: Response, bodyText: string, target: string) => {
+  const details = bodyText ? `\n${bodyText}` : '';
+
+  if (response.status === 503) {
+    return new Error(
+      `${target}暂时不可用（HTTP 503）。Render 服务可能已暂停、正在冷启动，或没有成功部署。请先确认 Render API 服务在线后重试。${details}`,
+    );
+  }
+
+  if (response.status === 404) {
+    return new Error(
+      `${target}地址不存在（HTTP 404）。请检查 VITE_API_BASE_URL 是否指向 minicompiler-api 服务。${details}`,
+    );
+  }
+
+  if (response.status >= 500) {
+    return new Error(
+      `${target}返回服务器错误（HTTP ${response.status} ${response.statusText}）。这通常来自 Render 后端或 Piston API。${details}`,
+    );
+  }
+
+  return new Error(
+    `${target}请求失败（HTTP ${response.status} ${response.statusText}）。${details}`,
+  );
+};
+
+const createFetchError = (error: any, target: string, timeoutMs: number) => {
+  if (error?.name === 'AbortError') {
+    return new Error(`${target}响应超时（超过 ${Math.round(timeoutMs / 1000)} 秒）。请稍后重试，或检查 Render/Piston 是否响应过慢。`);
+  }
+
+  if (error instanceof TypeError) {
+    return new Error(`无法连接${target}。请检查 VITE_API_BASE_URL、Render 服务状态和浏览器网络连接。`);
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+};
+
+const checkBackendHealth = async (onOutput: (text: string) => void) => {
+  const healthUrl = buildApiUrl('/api/health');
+  const healthStart = now();
+
+  try {
+    const response = await fetchWithTimeout(healthUrl, {
+      method: 'GET',
+    }, BACKEND_HEALTH_TIMEOUT_MS);
+
+    if (!response.ok) {
+      throw createHttpError(response, await readResponseText(response), '后端服务');
+    }
+
+    let version = '';
+    try {
+      const body = await response.json();
+      version = body?.version ? `, v${body.version}` : '';
+    } catch {
+      version = '';
+    }
+
+    onOutput(`[System] Backend API: online (${formatDuration(now() - healthStart)}${version}).\n`);
+  } catch (error: any) {
+    throw createFetchError(error, '后端服务', BACKEND_HEALTH_TIMEOUT_MS);
+  }
+};
+
 export const initCpp = async (): Promise<void> => {
   return Promise.resolve();
 };
@@ -52,8 +126,10 @@ export const runCppCode = async (
   onOutput(`[System] C++ runner: Render/Piston.\n`);
 
   try {
+    await checkBackendHealth(onOutput);
+
     const apiUrl = buildApiUrl('/api/compile/cpp');
-    const backendStart = now();
+    const pistonStart = now();
     const response = await fetchWithTimeout(apiUrl, {
       method: 'POST',
       headers: {
@@ -67,8 +143,7 @@ export const runCppCode = async (
 
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Request failed: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ''}`);
+      throw createHttpError(response, await readResponseText(response), 'Piston 代理');
     }
 
     const result: CompileResponse = await response.json();
@@ -77,7 +152,8 @@ export const runCppCode = async (
       throw new Error(result.message);
     }
 
-    onOutput(`[System] Backend response: ${formatDuration(now() - backendStart)}.\n`);
+    const cacheStatus = response.headers?.get?.('X-Compiler-Cache') || 'UNKNOWN';
+    onOutput(`[System] Piston response: ${formatDuration(now() - pistonStart)}. Cache: ${cacheStatus}.\n`);
 
     let hasFailure = false;
 
@@ -104,8 +180,9 @@ export const runCppCode = async (
       throw new Error('C++ execution failed.');
     }
   } catch (err: any) {
-    const msg = err?.message || String(err);
+    const friendlyError = createFetchError(err, '后端服务', BACKEND_TIMEOUT_MS);
+    const msg = friendlyError?.message || String(err);
     onOutput(`\n[Error] ${msg}`);
-    throw err;
+    throw friendlyError;
   }
 };

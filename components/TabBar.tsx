@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, FileCode, FileJson, BookOpen, Save, Download, Check, AlertCircle, Pencil, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, X, FileCode, FileJson, BookOpen, Save, Download, Check, AlertCircle, Pencil, ZoomIn, ZoomOut, Upload } from 'lucide-react';
 import { EditorTab, Language, ExampleSnippet } from '../types';
 import { CPP_EXAMPLES, PYTHON_EXAMPLES } from '../constants';
 
@@ -13,12 +13,14 @@ interface TabBarProps {
   onRename?: () => void;
   onFontIncrease?: () => void;
   onFontDecrease?: () => void;
+  onImportFile?: (file: File) => void;
 }
 
 const TabBar: React.FC<TabBarProps> = ({ 
   tabs, activeTabId, onSwitch, onClose, onAdd,
   onRename,
-  onFontIncrease, onFontDecrease
+  onFontIncrease, onFontDecrease,
+  onImportFile
 }) => {
   const isMaxTabs = tabs.length >= 3;
   const [showExamples, setShowExamples] = useState(false);
@@ -26,6 +28,7 @@ const TabBar: React.FC<TabBarProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const examplesRef = useRef<HTMLDivElement>(null);
   const saveMenuRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const currentLanguage = activeTab ? activeTab.language : Language.CPP;
@@ -71,6 +74,15 @@ const TabBar: React.FC<TabBarProps> = ({
     setSaveStatus('success');
     setTimeout(() => setSaveStatus('idle'), 2000);
     setShowSaveMenu(false);
+  };
+
+  const handleImportChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onImportFile?.(file);
+      setShowSaveMenu(false);
+    }
+    event.target.value = '';
   };
 
   return (
@@ -179,6 +191,13 @@ const TabBar: React.FC<TabBarProps> = ({
 
         {/* Save Button */}
         <div ref={saveMenuRef} className="relative">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".py,.cpp,.cc,.cxx,text/plain"
+            className="hidden"
+            onChange={handleImportChange}
+          />
           <button
             onClick={() => setShowSaveMenu(!showSaveMenu)}
             className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${
@@ -208,6 +227,9 @@ const TabBar: React.FC<TabBarProps> = ({
                 保存文件
               </div>
               <div className="py-1">
+                <div className="px-4 py-2 text-xs text-secondary border-b border-border/60">
+                  自动保存已开启
+                </div>
                 <button
                   onClick={handleDownloadLocal}
                   className="w-full text-left px-4 py-2.5 text-sm text-mainText hover:bg-background/80 hover:text-primary transition-colors flex items-center gap-3"
@@ -216,6 +238,16 @@ const TabBar: React.FC<TabBarProps> = ({
                   <div>
                     <div className="font-medium">下载到本地</div>
                     <div className="text-xs text-secondary">保存为 {activeTab?.title}</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  className="w-full text-left px-4 py-2.5 text-sm text-mainText hover:bg-background/80 hover:text-primary transition-colors flex items-center gap-3"
+                >
+                  <Upload size={14} className="opacity-70" />
+                  <div>
+                    <div className="font-medium">打开本地文件</div>
+                    <div className="text-xs text-secondary">支持 .cpp / .py</div>
                   </div>
                 </button>
                 <button

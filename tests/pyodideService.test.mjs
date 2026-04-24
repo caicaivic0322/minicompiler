@@ -60,3 +60,48 @@ test('runPythonCode flushes Python output that does not end with a newline', asy
 
   assert.equal(output.join(''), '0 1 2 3 4 5 ');
 });
+
+test('runPythonCode wraps user code with a timeout guard and rejects Python failures', async () => {
+  let userExecutionCode = '';
+
+  const fakePyodide = {
+    setStdout() {},
+    setStderr() {},
+    setStdin() {},
+    async runPythonAsync(code) {
+      if (code.includes('sys.stdout.flush')) return;
+
+      userExecutionCode = code;
+      throw new Error('Traceback (most recent call last):\nEOFError: EOF when reading a line');
+    },
+  };
+
+  globalThis.window = {
+    loadPyodide: async () => fakePyodide,
+  };
+  globalThis.document = {
+    createElement() {
+      return {};
+    },
+    body: {
+      appendChild(node) {
+        queueMicrotask(() => node.onload?.({}));
+        return node;
+      },
+    },
+  };
+
+  const { runPythonCode } = await importTypeScriptModule(
+    new URL('../services/pyodideService.ts', import.meta.url),
+  );
+  const output = [];
+
+  await assert.rejects(
+    runPythonCode('name = input()', '', (text) => output.push(text)),
+    /Python execution failed/,
+  );
+
+  assert.match(userExecutionCode, /sys\.settrace/);
+  assert.match(userExecutionCode, /TimeoutError/);
+  assert.match(output.join(''), /输入不足/);
+});

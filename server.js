@@ -146,7 +146,20 @@ app.post('/api/compile/cpp', async (req, res) => {
 
 // 健康检查 API
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.2' });
+  res.json({
+    status: 'ok',
+    version: '1.0.3',
+    piston: {
+      apiUrl: PISTON_API_URL,
+      hasApiKey: Boolean(PISTON_API_KEY),
+      timeoutMs: PISTON_TIMEOUT_MS,
+    },
+    cache: {
+      ttlMs: PISTON_CACHE_TTL_MS,
+      maxEntries: PISTON_CACHE_MAX_ENTRIES,
+      size: pistonCache.size,
+    },
+  });
 });
 
 // API only - no static file serving here

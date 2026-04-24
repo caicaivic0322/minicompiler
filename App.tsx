@@ -8,10 +8,32 @@ import { Language, ConsoleMessage, ThemeKey, EditorTab, ExampleSnippet } from '.
 import { SNIPPETS, THEMES } from './constants';
 import { initPyodide, runPythonCode } from './services/pyodideService';
 import { initCpp, runCppCode } from './services/cppService';
+import { EDITOR_SESSION_STORAGE_KEY, parseEditorSession, serializeEditorSession } from './services/sessionPersistence';
 
 const CodeEditor = lazy(() => import('./components/Editor'));
 
+const DEFAULT_TABS: EditorTab[] = [
+  { id: '1', title: 'main.py', code: SNIPPETS[Language.PYTHON], language: Language.PYTHON }
+];
+
+const loadInitialSession = () => {
+  if (typeof window === 'undefined') {
+    return { tabs: DEFAULT_TABS, activeTabId: '1', stdin: '' };
+  }
+
+  try {
+    const savedSession = parseEditorSession(window.localStorage.getItem(EDITOR_SESSION_STORAGE_KEY));
+    if (savedSession) return savedSession;
+  } catch (error) {
+    console.warn('Failed to restore editor session:', error);
+  }
+
+  return { tabs: DEFAULT_TABS, activeTabId: '1', stdin: '' };
+};
+
 function App() {
+  const [initialSession] = useState(loadInitialSession);
+
   // Theme State
   const [theme, setTheme] = useState<ThemeKey>('cream');
   const [isEditorLoaded, setIsEditorLoaded] = useState(false);
@@ -23,10 +45,8 @@ function App() {
   const [tabToRenameId, setTabToRenameId] = useState<string | null>(null);
 
   // Tab State
-  const [tabs, setTabs] = useState<EditorTab[]>([
-    { id: '1', title: 'main.py', code: SNIPPETS[Language.PYTHON], language: Language.PYTHON }
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>('1');
+  const [tabs, setTabs] = useState<EditorTab[]>(initialSession.tabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialSession.activeTabId);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
 
@@ -54,7 +74,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Input State
-  const [stdin, setStdin] = useState('');
+  const [stdin, setStdin] = useState(initialSession.stdin);
 
   const addLog = (type: ConsoleMessage['type'], content: string) => {
     setMessages(prev => {
@@ -122,6 +142,17 @@ function App() {
     initializeRuntimes();
 
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const snapshot = serializeEditorSession(tabs, activeTabId, stdin);
+      window.localStorage.setItem(EDITOR_SESSION_STORAGE_KEY, JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn('Failed to autosave editor session:', error);
+    }
+  }, [tabs, activeTabId, stdin]);
 
   useEffect(() => {
     if (isEditorLoaded) {
@@ -294,6 +325,47 @@ function App() {
     }));
   };
 
+  const handleImportFile = useCallback(async (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    const importedLanguage = lowerName.endsWith('.py')
+      ? Language.PYTHON
+      : lowerName.endsWith('.cpp') || lowerName.endsWith('.cc') || lowerName.endsWith('.cxx')
+        ? Language.CPP
+        : null;
+
+    if (!importedLanguage) {
+      addLog('error', '只支持打开 .py、.cpp、.cc 或 .cxx 文件。');
+      return;
+    }
+
+    try {
+      const code = await file.text();
+      const shouldReplaceActiveTab = tabs.length >= 3;
+      const importedTabId = shouldReplaceActiveTab ? activeTabId : Date.now().toString();
+      const importedTab: EditorTab = {
+        id: importedTabId,
+        title: file.name,
+        code,
+        language: importedLanguage,
+      };
+
+      setTabs(prev => {
+        if (shouldReplaceActiveTab) {
+          return prev.map(tab => tab.id === activeTabId ? importedTab : tab);
+        }
+        return [...prev, importedTab];
+      });
+
+      setActiveTabId(importedTabId);
+      addLog('success', shouldReplaceActiveTab
+        ? `✓ 已用 "${file.name}" 替换当前标签。`
+        : `✓ 已打开 "${file.name}"。`);
+    } catch (error) {
+      console.error(error);
+      addLog('error', `读取文件失败：${file.name}`);
+    }
+  }, [activeTabId, tabs.length]);
+
 
   const executeCode = useCallback(async () => {
     if (isRunning) return;
@@ -349,7 +421,7 @@ function App() {
     } finally {
       setIsRunning(false);
     }
-  }, [activeTab, runtimeStatus, isRunning]);
+  }, [activeTab, runtimeStatus, isRunning, stdin]);
 
 
 
@@ -404,6 +476,7 @@ function App() {
             }}
             onFontIncrease={handleEditorFontIncrease}
             onFontDecrease={handleEditorFontDecrease}
+            onImportFile={handleImportFile}
           />
 
           {/* Editor */}
